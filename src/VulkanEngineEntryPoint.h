@@ -11,11 +11,16 @@
 #include "rendering/VulkanTexture.h"
 #include "rendering/Camera.h"
 
+#include "opencv4/opencv2/opencv.hpp"
+
 #include "glm/glm.hpp"
 
 #define WINDOW_WIDTH 1920
 #define WINDOW_HEIGHT 1080
 #define WINDOW_TITLE "Vulkan Compute Render Window"
+#define VIDEO_PATH "/home/standa/3_1_1_1/camera_ir/video.mp4"
+#define VIDEO_DOWNSCALE_FACTOR 1
+#define SHADER_NAME "DarkChannelPrior"
 
 struct Vertex {
     float pos[3];
@@ -57,7 +62,7 @@ public:
     ~VulkanEngineEntryPoint();
 
     void prepareInputImage();
-    bool loadImageFromFile(const char *file, void *pixels, size_t &size, int &width, int &height, int &channels);
+    bool loadImageFromFile(const std::string& file, void *pixels, size_t &size, int &width, int &height, int &channels);
     void generateQuad();
     void setupVertexDescriptions();
     void prepareUniformBuffers();
@@ -71,7 +76,11 @@ public:
     void render();
     void handleEvents();
 
+    void updateComputeDescriptorSets();
+
     bool isRunning = false;
+    uint32_t frameIndex = 0;
+    uint32_t totalFrames = -1;
 private:
 
     VkPipelineShaderStageCreateInfo loadShader(std::string fileName, VkShaderStageFlagBits stage);
@@ -82,6 +91,8 @@ private:
     VulkanEngineDevice engineDevice{window, WINDOW_TITLE};
     VulkanEngineRenderer renderer{window, engineDevice};
     Camera camera{};
+
+    cv::VideoCapture video{VIDEO_PATH };
 
     Texture2D inputTexture;
     Texture2D outputTexture;

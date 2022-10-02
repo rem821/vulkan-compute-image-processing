@@ -8,7 +8,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 
 file(GLOB_RECURSE SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp)
 message(${SOURCES})
-add_executable(${NAME} ${SOURCES})
+add_executable(${NAME} ${SOURCES} external/stb/stb_image_resize.h)
 
 target_include_directories(${NAME} PUBLIC external/sdl/)
 
@@ -26,7 +26,10 @@ target_link_directories(${PROJECT_NAME} PRIVATE external/imgui/)
 
 find_package(Vulkan REQUIRED)
 
-target_link_libraries(${NAME} Vulkan::Vulkan SDL2 fmt glm ImGui)
+find_package( OpenCV REQUIRED )
+include_directories( ${OpenCV_INCLUDE_DIRS} )
+
+target_link_libraries(${NAME} Vulkan::Vulkan SDL2 fmt glm ImGui ${OpenCV_LIBS})
 
 ############## Build SHADERS #######################
 
@@ -59,6 +62,3 @@ foreach(GLSL ${GLSL_SOURCE_FILES})
 endforeach(GLSL)
 
 add_custom_target(ComputeShaders DEPENDS ${SPIRV_BINARY_FILES})
-
-file(COPY shaders DESTINATION ${CMAKE_BINARY_DIR})
-file(COPY assets DESTINATION ${CMAKE_BINARY_DIR})

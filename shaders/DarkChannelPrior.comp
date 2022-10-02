@@ -4,11 +4,11 @@ layout (local_size_x = 16, local_size_y = 16) in;
 layout (binding = 0, rgba8) uniform readonly image2D inputImage;
 layout (binding = 1, rgba8) uniform image2D resultImage;
 
-const int kernelSize = 16;
+const int kernelSize = 8;
 
 struct ImageData
 {
-    float pixels[4 * kernelSize * kernelSize];
+    float pixels[kernelSize * kernelSize];
 } kernelMinChannels;
 
 void main()
