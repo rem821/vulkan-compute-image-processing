@@ -8,6 +8,7 @@
 
 #include "VulkanTexture.h"
 #include "VulkanTools.h"
+#include <cassert>
 
 void Texture::updateDescriptor() {
     descriptor.sampler = sampler;

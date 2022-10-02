@@ -3,6 +3,8 @@
 //
 #include "VulkanEngineEntryPoint.h"
 #include <vulkan/vulkan.hpp>
+
+#define STB_IMAGE_IMPLEMENTATION
 #include "../external/stb/stb_image.h"
 
 char *inputFile = "../assets/input.png";
@@ -544,5 +546,32 @@ void VulkanEngineEntryPoint::render() {
 
         renderer.endSwapChainRenderPass(bufferPair.graphicsCommandBuffer);
         renderer.endFrame();
+    }
+}
+
+void VulkanEngineEntryPoint::handleEvents() {
+    SDL_Event event;
+    while (SDL_PollEvent(&event) != 0) {
+        switch (event.type) {
+            case SDL_QUIT:
+                isRunning = false;
+                break;
+            case SDL_WINDOWEVENT:
+                if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
+                    SDL_Window *win = SDL_GetWindowFromID(event.window.windowID);
+                    int w;
+                    int h;
+                    SDL_GetWindowSize(win, &w, &h);
+                    window.onWindowResized(static_cast<uint32_t>(w), static_cast<uint32_t>(h));
+                }
+            default:
+                break;
+        }
+    }
+
+    const Uint8 *keystate = SDL_GetKeyboardState(nullptr);
+
+    if (keystate[SDL_SCANCODE_ESCAPE]) {
+        isRunning = false;
     }
 }

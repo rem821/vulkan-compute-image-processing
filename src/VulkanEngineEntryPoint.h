@@ -69,6 +69,7 @@ public:
     void prepareCompute();
 
     void render();
+    void handleEvents();
 
     bool isRunning = false;
 private:
