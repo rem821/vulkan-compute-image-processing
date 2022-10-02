@@ -1,0 +1,16 @@
+#version 450
+
+layout(set = 0, binding = 0) buffer InBuffer{
+    int elements[];
+} inputData;
+layout(set = 0, binding = 1) buffer OutBuffer{
+    int elements[];
+} outputData;
+
+void main()
+{
+    int gID = int(gl_GlobalInvocationID.x);
+
+    //inputData.elements[gID] = gID + 1;
+    outputData.elements[gID] = inputData.elements[gID] * inputData.elements[gID];
+}
