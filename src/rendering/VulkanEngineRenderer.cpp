@@ -13,14 +13,14 @@ VulkanEngineRenderer::VulkanEngineRenderer(VulkanEngineWindow &window, VulkanEng
 
 VulkanEngineRenderer::~VulkanEngineRenderer() { freeCommandBuffers(); }
 
-VkCommandBuffer VulkanEngineRenderer::beginFrame() {
+CommandBufferPair VulkanEngineRenderer::beginFrame() {
     assert(!isFrameStarted && "Can't call beginFrame while already in progress!");
 
     auto result = engineSwapChain->acquireNextImage(&currentImageIndex);
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
         recreateSwapChain();
-        return nullptr;
+        return CommandBufferPair{};
     }
     if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         throw std::runtime_error("Failed to acquire swap chain image!");
@@ -28,22 +28,35 @@ VkCommandBuffer VulkanEngineRenderer::beginFrame() {
 
     isFrameStarted = true;
 
-    auto commandBuffer = getCurrentGraphicsCommandBuffer();
-    VkCommandBufferBeginInfo beginInfo {};
+    // Begin compute command buffer
+    VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+    if (vkBeginCommandBuffer(computeCommandBuffer, &beginInfo) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to begin compute command buffer!");
+    }
+
+    // Begin graphics command buffer
+    auto graphicsCommandBuffer = getCurrentGraphicsCommandBuffer();
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+    if (vkBeginCommandBuffer(graphicsCommandBuffer, &beginInfo) != VK_SUCCESS) {
         throw std::runtime_error("Failed to begin recording command buffer!");
     }
-    return commandBuffer;
+
+    return CommandBufferPair{graphicsCommandBuffer, computeCommandBuffer};
 }
 
 void VulkanEngineRenderer::endFrame() {
     assert(isFrameStarted && "Can't call endFrame while frame is not in progress!");
     auto commandBuffer = getCurrentGraphicsCommandBuffer();
 
+    if(vkEndCommandBuffer(computeCommandBuffer) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to record compute command buffer!");
+    }
+
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to record command buffer!");
+        throw std::runtime_error("Failed to record graphics command buffer!");
     }
 
     auto result = engineSwapChain->submitCommandBuffers(&commandBuffer, &computeCommandBuffer, &currentImageIndex);
@@ -85,7 +98,7 @@ void VulkanEngineRenderer::beginSwapChainRenderPass(VkCommandBuffer commandBuffe
     imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
     imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
     imageMemoryBarrier.image = outputImage;
-    imageMemoryBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+    imageMemoryBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -102,12 +115,12 @@ void VulkanEngineRenderer::beginSwapChainRenderPass(VkCommandBuffer commandBuffe
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 }
 
-void VulkanEngineRenderer::endSwapChainRenderPass(VkCommandBuffer commandBuffer) {
+void VulkanEngineRenderer::endSwapChainRenderPass(VkCommandBuffer graphicsCommandBuffer) {
     assert(isFrameStarted && "Can't call endSwapChainRenderPass if frame is not in progress!");
-    assert(commandBuffer == getCurrentGraphicsCommandBuffer() &&
+    assert(graphicsCommandBuffer == getCurrentGraphicsCommandBuffer() &&
            "Can't end render pass on command buffer from a different frame");
 
-    vkCmdEndRenderPass(commandBuffer);
+    vkCmdEndRenderPass(graphicsCommandBuffer);
 }
 
 void VulkanEngineRenderer::createCommandBuffers() {

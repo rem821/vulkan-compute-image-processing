@@ -37,20 +37,20 @@ public:
 
     // Resources for the graphics part of the example
     struct {
-        VkDescriptorSetLayout descriptorSetLayout;	// Image display shader binding layout
-        VkDescriptorSet descriptorSetPreCompute;	// Image display shader bindings before compute shader image manipulation
-        VkDescriptorSet descriptorSetPostCompute;	// Image display shader bindings after compute shader image manipulation
-        VkPipeline pipeline;						// Image display pipeline
-        VkPipelineLayout pipelineLayout;			// Layout of the graphics pipeline
+        VkDescriptorSetLayout descriptorSetLayout;    // Image display shader binding layout
+        VkDescriptorSet descriptorSetPreCompute;    // Image display shader bindings before compute shader image manipulation
+        VkDescriptorSet descriptorSetPostCompute;    // Image display shader bindings after compute shader image manipulation
+        VkPipeline pipeline;                        // Image display pipeline
+        VkPipelineLayout pipelineLayout;            // Layout of the graphics pipeline
     } graphics;
 
     // Resources for the compute part of the example
     struct Compute {
-        VkDescriptorSetLayout descriptorSetLayout;	// Compute shader binding layout
-        VkDescriptorSet descriptorSet;				// Compute shader bindings
-        VkPipelineLayout pipelineLayout;			// Layout of the compute pipeline
-        std::vector<VkPipeline> pipelines;			// Compute pipelines for image filters
-        int32_t pipelineIndex = 0;					// Current image filtering compute pipeline index
+        VkDescriptorSetLayout descriptorSetLayout;    // Compute shader binding layout
+        VkDescriptorSet descriptorSet;                // Compute shader bindings
+        VkPipelineLayout pipelineLayout;            // Layout of the compute pipeline
+        std::vector<VkPipeline> pipelines;            // Compute pipelines for image filters
+        int32_t pipelineIndex = 0;                    // Current image filtering compute pipeline index
     } compute;
 
     VulkanEngineEntryPoint();
@@ -66,9 +66,7 @@ public:
     void preparePipelines();
     void setupDescriptorPool();
     void setupDescriptorSet();
-    void prepareGraphics();
     void prepareCompute();
-    void buildCommandBuffers();
 
     void render();
 
@@ -78,10 +76,8 @@ private:
     VkPipelineShaderStageCreateInfo loadShader(std::string fileName, VkShaderStageFlagBits stage);
     VkShaderModule loadShaderModule(const char *fileName, VkDevice device);
 
-    void buildComputeCommandBuffer();
 
-    VulkanEngineWindow window{WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT,
-                              SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE};
+    VulkanEngineWindow window{WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE};
     VulkanEngineDevice engineDevice{window, WINDOW_TITLE};
     VulkanEngineRenderer renderer{window, engineDevice};
     Camera camera{};

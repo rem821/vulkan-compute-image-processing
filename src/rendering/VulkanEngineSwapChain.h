@@ -12,7 +12,7 @@
 
 class VulkanEngineSwapChain {
 public:
-    static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+    static constexpr int MAX_FRAMES_IN_FLIGHT = 1;
 
     VulkanEngineSwapChain(VulkanEngineDevice &engineDevice, VkExtent2D extent);
     VulkanEngineSwapChain(VulkanEngineDevice &engineDevice, VkExtent2D extent,
@@ -86,7 +86,6 @@ private:
 
     std::vector<VkSemaphore> imageAvailableSemaphores;
     std::vector<VkSemaphore> renderFinishedSemaphores;
-    VkSemaphore graphicsSemaphore;
     VkSemaphore computeSemaphore;
 
     std::vector<VkFence> inFlightFences;

@@ -100,7 +100,7 @@ VkResult VulkanEngineSwapChain::submitCommandBuffers(const VkCommandBuffer *buff
     computeSubmitInfo.commandBufferCount = 1;
     computeSubmitInfo.pCommandBuffers = computeCommandBuffer;
     computeSubmitInfo.waitSemaphoreCount = 1;
-    computeSubmitInfo.pWaitSemaphores = &graphicsSemaphore;
+    computeSubmitInfo.pWaitSemaphores = &imageAvailableSemaphores[currentFrame];
     computeSubmitInfo.pWaitDstStageMask = &waitStageMask;
     computeSubmitInfo.signalSemaphoreCount = 1;
     computeSubmitInfo.pSignalSemaphores = &computeSemaphore;
@@ -110,8 +110,8 @@ VkResult VulkanEngineSwapChain::submitCommandBuffers(const VkCommandBuffer *buff
     }
 
     VkPipelineStageFlags graphicsWaitStageMasks[] = { VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-    VkSemaphore graphicsWaitSemaphores[] = { computeSemaphore, imageAvailableSemaphores[currentFrame] };
-    VkSemaphore graphicsSignalSemaphores[] = { graphicsSemaphore, renderFinishedSemaphores[currentFrame] };
+    VkSemaphore graphicsWaitSemaphores[] = { computeSemaphore };
+    VkSemaphore graphicsSignalSemaphores[] = { renderFinishedSemaphores[currentFrame] };
 
     // Submit graphics commands
     VkSubmitInfo graphicsSubmitInfo = {};
@@ -119,10 +119,10 @@ VkResult VulkanEngineSwapChain::submitCommandBuffers(const VkCommandBuffer *buff
     graphicsSubmitInfo.pSignalSemaphores = &renderFinishedSemaphores[currentFrame];
     graphicsSubmitInfo.commandBufferCount = 1;
     graphicsSubmitInfo.pCommandBuffers = buffers;
-    graphicsSubmitInfo.waitSemaphoreCount = 2;
+    graphicsSubmitInfo.waitSemaphoreCount = 1;
     graphicsSubmitInfo.pWaitSemaphores = graphicsWaitSemaphores;
     graphicsSubmitInfo.pWaitDstStageMask = graphicsWaitStageMasks;
-    graphicsSubmitInfo.signalSemaphoreCount = 2;
+    graphicsSubmitInfo.signalSemaphoreCount = 1;
     graphicsSubmitInfo.pSignalSemaphores = graphicsSignalSemaphores;
 
     vkResetFences(engineDevice.getDevice(), 1, &inFlightFences[currentFrame]);
@@ -213,6 +213,12 @@ void VulkanEngineSwapChain::createImageViews() {
         viewInfo.image = swapChainImages[i];
         viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
         viewInfo.format = swapChainImageFormat;
+        viewInfo.components = {
+                VK_COMPONENT_SWIZZLE_R,
+                VK_COMPONENT_SWIZZLE_G,
+                VK_COMPONENT_SWIZZLE_B,
+                VK_COMPONENT_SWIZZLE_A
+        };
         viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         viewInfo.subresourceRange.baseMipLevel = 0;
         viewInfo.subresourceRange.levelCount = 1;
@@ -367,42 +373,22 @@ void VulkanEngineSwapChain::createSyncObjects() {
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        if (vkCreateSemaphore(engineDevice.getDevice(), &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) !=
-            VK_SUCCESS ||
-            vkCreateSemaphore(engineDevice.getDevice(), &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) !=
-            VK_SUCCESS ||
+        if (vkCreateSemaphore(engineDevice.getDevice(), &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
+            vkCreateSemaphore(engineDevice.getDevice(), &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
             vkCreateFence(engineDevice.getDevice(), &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create synchronization objects for a frame!");
         }
     }
 
-    if (vkCreateSemaphore(engineDevice.getDevice(), &semaphoreInfo, nullptr, &graphicsSemaphore) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create semaphore for compute & graphics sync!");
-    }
-
     if (vkCreateSemaphore(engineDevice.getDevice(), &semaphoreInfo, nullptr, &computeSemaphore) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create semaphore for compute & graphics sync!");
-    }
-
-    // Signal the semaphore
-
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = &graphicsSemaphore;
-    if (vkQueueSubmit(engineDevice.graphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to submit graphics queue!");
-    }
-    if (vkQueueWaitIdle(engineDevice.graphicsQueue()) != VK_SUCCESS) {
-        throw std::runtime_error("Something went wrong!");
     }
 }
 
 VkSurfaceFormatKHR
 VulkanEngineSwapChain::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats) {
     for (const auto &availableFormat: availableFormats) {
-        if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
-            availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+        if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
             return availableFormat;
         }
     }

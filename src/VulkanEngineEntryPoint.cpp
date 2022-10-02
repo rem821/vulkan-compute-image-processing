@@ -298,7 +298,7 @@ VkShaderModule VulkanEngineEntryPoint::loadShaderModule(const char *fileName, Vk
         moduleCreateInfo.codeSize = size;
         moduleCreateInfo.pCode = (uint32_t *) shaderCode;
 
-        if (vkCreateShaderModule(device, &moduleCreateInfo, NULL, &shaderModule) != VK_SUCCESS) {
+        if (vkCreateShaderModule(device, &moduleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create shader module!");
         }
 
@@ -475,7 +475,7 @@ void VulkanEngineEntryPoint::prepareCompute() {
             inputImageDescriptorSet,
             outputImageDescriptorSet
     };
-    vkUpdateDescriptorSets(engineDevice.getDevice(), computeWriteDescriptorSets.size(), computeWriteDescriptorSets.data(), 0, NULL);
+    vkUpdateDescriptorSets(engineDevice.getDevice(), computeWriteDescriptorSets.size(), computeWriteDescriptorSets.data(), 0, nullptr);
 
     // Create compute shader pipelines
     VkComputePipelineCreateInfo computePipelineCreateInfo{};
@@ -494,33 +494,20 @@ void VulkanEngineEntryPoint::prepareCompute() {
         }
         compute.pipelines.push_back(pipeline);
     }
-
-    // Build a single command buffer containing compute dispatch commands
-    buildComputeCommandBuffer();
-}
-
-void VulkanEngineEntryPoint::buildComputeCommandBuffer() {
-    // Flush the queue if we're rebuilding the command buffer after a pipeline change to ensure it's not currently in use
-    vkQueueWaitIdle(engineDevice.computeQueue());
-
-    VkCommandBufferBeginInfo cmdBufInfo{};
-    cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-    if (vkBeginCommandBuffer(renderer.getComputeCommandBuffer(), &cmdBufInfo) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to begin compute command buffer!");
-    }
-
-    vkCmdBindPipeline(renderer.getComputeCommandBuffer(), VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipelines[compute.pipelineIndex]);
-    vkCmdBindDescriptorSets(renderer.getComputeCommandBuffer(), VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipelineLayout, 0, 1, &compute.descriptorSet, 0, 0);
-
-    vkCmdDispatch(renderer.getComputeCommandBuffer(), outputTexture.width / 16, outputTexture.height / 16, 1);
-
-    vkEndCommandBuffer(renderer.getComputeCommandBuffer());
 }
 
 void VulkanEngineEntryPoint::render() {
-    if (auto commandBuffer = renderer.beginFrame()) {
-        renderer.beginSwapChainRenderPass(commandBuffer, outputTexture.image);
+    CommandBufferPair bufferPair = renderer.beginFrame();
+    if (bufferPair.computeCommandBuffer != nullptr && bufferPair.graphicsCommandBuffer != nullptr) {
+        // Record compute command buffer
+        vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipelines[compute.pipelineIndex]);
+        vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipelineLayout, 0, 1, &compute.descriptorSet, 0,
+                                nullptr);
+
+        vkCmdDispatch(bufferPair.computeCommandBuffer, outputTexture.width / 16, outputTexture.height / 16, 1);
+
+        // Record graphics commandBuffer
+        renderer.beginSwapChainRenderPass(bufferPair.graphicsCommandBuffer, outputTexture.image);
 
         // Render first half of the screen
         VkViewport viewport = {};
@@ -532,28 +519,30 @@ void VulkanEngineEntryPoint::render() {
         viewport.maxDepth = 1.0f;
         VkRect2D scissor{{0, 0}, renderer.getEngineSwapChain()->getSwapChainExtent()};
 
-        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+        vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
+        vkCmdSetScissor(bufferPair.graphicsCommandBuffer, 0, 1, &scissor);
 
         VkDeviceSize offsets[1] = {0};
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffer->getBuffer(), offsets);
-        vkCmdBindIndexBuffer(commandBuffer, *indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+        vkCmdBindVertexBuffers(bufferPair.graphicsCommandBuffer, 0, 1, vertexBuffer->getBuffer(), offsets);
+        vkCmdBindIndexBuffer(bufferPair.graphicsCommandBuffer, *indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
         // Left (pre compute)
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipelineLayout, 0, 1, &graphics.descriptorSetPreCompute, 0, NULL);
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
+        vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipelineLayout, 0, 1,
+                                &graphics.descriptorSetPreCompute, 0, nullptr);
+        vkCmdBindPipeline(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
 
-        vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
+        vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
 
         // Right (post compute)
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipelineLayout, 0, 1, &graphics.descriptorSetPostCompute, 0, NULL);
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
+        vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipelineLayout, 0, 1,
+                                &graphics.descriptorSetPostCompute, 0, nullptr);
+        vkCmdBindPipeline(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
 
         viewport.x = static_cast<float>(renderer.getEngineSwapChain()->getSwapChainExtent().width * 0.5f);
-        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-        vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
+        vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
+        vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
 
-        renderer.endSwapChainRenderPass(commandBuffer);
+        renderer.endSwapChainRenderPass(bufferPair.graphicsCommandBuffer);
         renderer.endFrame();
     }
 }

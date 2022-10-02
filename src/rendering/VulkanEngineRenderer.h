@@ -12,8 +12,12 @@
 #include <stdexcept>
 #include <cassert>
 
-class VulkanEngineRenderer {
+struct CommandBufferPair {
+    VkCommandBuffer graphicsCommandBuffer;
+    VkCommandBuffer computeCommandBuffer;
+};
 
+class VulkanEngineRenderer {
 public:
     VulkanEngineRenderer(VulkanEngineWindow &window, VulkanEngineDevice &device);
     ~VulkanEngineRenderer();
@@ -41,10 +45,10 @@ public:
         return currentFrameIndex;
     }
 
-    VkCommandBuffer beginFrame();
+    CommandBufferPair beginFrame();
     void endFrame();
     void beginSwapChainRenderPass(VkCommandBuffer commandBuffer, VkImage &outputImage);
-    void endSwapChainRenderPass(VkCommandBuffer commandBuffer);
+    void endSwapChainRenderPass(VkCommandBuffer graphicsCommandBuffer);
 
 private:
     void createCommandBuffers();
