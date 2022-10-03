@@ -61,6 +61,8 @@ private:
     std::vector<VkCommandBuffer> graphicsCommandBuffers;
     VkCommandBuffer computeCommandBuffer;
 
+    VkImage currentImage;
+
     uint32_t currentImageIndex;
     int currentFrameIndex = 0;
 

@@ -18,9 +18,11 @@
 #define WINDOW_WIDTH 1920
 #define WINDOW_HEIGHT 1080
 #define WINDOW_TITLE "Vulkan Compute Render Window"
-#define VIDEO_PATH "/home/standa/3_1_1_1/camera_ir/video.mp4"
+//#define VIDEO_PATH "/home/standa/3_1_1_1/camera_ir/video.mp4"
+#define VIDEO_PATH "../assets/video.mp4"
 #define VIDEO_DOWNSCALE_FACTOR 1
 #define SHADER_NAME "DarkChannelPrior"
+#define PLAY_VIDEO false
 
 struct Vertex {
     float pos[3];
@@ -61,7 +63,7 @@ public:
     VulkanEngineEntryPoint();
     ~VulkanEngineEntryPoint();
 
-    void prepareInputImage();
+    void prepareInputImage(bool playVideo);
     bool loadImageFromFile(const std::string& file, void *pixels, size_t &size, int &width, int &height, int &channels);
     void generateQuad();
     void setupVertexDescriptions();
@@ -78,6 +80,8 @@ public:
 
     void updateComputeDescriptorSets();
 
+    void saveScreenshot(const char *filename);
+
     bool isRunning = false;
     uint32_t frameIndex = 0;
     uint32_t totalFrames = -1;
@@ -85,6 +89,17 @@ private:
 
     VkPipelineShaderStageCreateInfo loadShader(std::string fileName, VkShaderStageFlagBits stage);
     VkShaderModule loadShaderModule(const char *fileName, VkDevice device);
+
+    void insertImageMemoryBarrier(
+            VkCommandBuffer cmdbuffer,
+            VkImage image,
+            VkAccessFlags srcAccessMask,
+            VkAccessFlags dstAccessMask,
+            VkImageLayout oldImageLayout,
+            VkImageLayout newImageLayout,
+            VkPipelineStageFlags srcStageMask,
+            VkPipelineStageFlags dstStageMask,
+            VkImageSubresourceRange subresourceRange);
 
 
     VulkanEngineWindow window{WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE};

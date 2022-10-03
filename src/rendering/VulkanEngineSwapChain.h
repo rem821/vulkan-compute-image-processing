@@ -27,6 +27,8 @@ public:
 
     VkRenderPass getRenderPass() { return renderPass; };
 
+    VkImage getImage(int index) { return swapChainImages[index]; };
+
     VkImageView getImageView(int index) { return swapChainImageViews[index]; };
 
     size_t imageCount() { return swapChainImages.size(); };

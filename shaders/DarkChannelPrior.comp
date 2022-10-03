@@ -1,6 +1,6 @@
 #version 450
 
-layout (local_size_x = 16, local_size_y = 16) in;
+layout (local_size_x = 1, local_size_y = 1) in;
 layout (binding = 0, rgba8) uniform readonly image2D inputImage;
 layout (binding = 1, rgba8) uniform image2D resultImage;
 
@@ -20,10 +20,8 @@ void main()
         for (int j = -kernelSize; j <= kernelSize; ++j)
         {
             vec3 rgb = imageLoad(inputImage, ivec2(gl_GlobalInvocationID.x + i, gl_GlobalInvocationID.y + j)).rgb;
-            float minRG = min(rgb.r, rgb.g);
-            float minRGB = min(minRG, rgb.b);
 
-            kernelMinChannels.pixels[n] = minRGB;
+            kernelMinChannels.pixels[n] = min(min(rgb.r, rgb.g), rgb.b);
             n++;
         }
     }

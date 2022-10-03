@@ -16,6 +16,9 @@
 #include <iostream>
 #include <unordered_set>
 
+//#define VALIDATION_LAYER_NAME "VK_LAYER_LUNARG_standard_validation"
+#define VALIDATION_LAYER_NAME "VK_LAYER_KHRONOS_validation"
+
 struct SwapChainSupportDetails {
     VkSurfaceCapabilitiesKHR capabilities;
     std::vector<VkSurfaceFormatKHR> formats;
@@ -140,6 +143,6 @@ private:
     VkQueue presentQueue_;
     VkQueue computeQueue_;
 
-    const std::vector<const char *> validationLayers = {"VK_LAYER_LUNARG_standard_validation"};
+    const std::vector<const char *> validationLayers = {VALIDATION_LAYER_NAME};
     const std::vector<const char *> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 };

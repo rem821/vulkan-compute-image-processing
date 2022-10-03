@@ -5,16 +5,23 @@
 #include <vulkan/vulkan.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
+
 #include "../external/stb/stb_image.h"
 
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
+
 #include "../external/stb/stb_image_resize.h"
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+
+#include "../external/stb/stb_image_write.h"
+
 
 #include <fmt/core.h>
 
 
 VulkanEngineEntryPoint::VulkanEngineEntryPoint() {
-    prepareInputImage();
+    prepareInputImage(PLAY_VIDEO);
     generateQuad();
     setupVertexDescriptions();
 
@@ -37,48 +44,51 @@ VulkanEngineEntryPoint::~VulkanEngineEntryPoint() {
 
 }
 
-void VulkanEngineEntryPoint::prepareInputImage() {
-    cv::Mat frame;
-    video.read(frame);
+void VulkanEngineEntryPoint::prepareInputImage(bool playVideo) {
+    if (playVideo) {
+        cv::Mat frame;
+        video.read(frame);
 
-    int32_t width = frame.cols;
-    int32_t height = frame.rows;
-    int32_t channels = 4;
-    size_t size = width * height * channels;
+        int32_t width = frame.cols;
+        int32_t height = frame.rows;
+        int32_t channels = 4;
+        size_t size = width * height * channels;
 
-    int32_t d_width = width / VIDEO_DOWNSCALE_FACTOR;
-    int32_t d_height = height / VIDEO_DOWNSCALE_FACTOR;
-    int32_t d_channels = 3;
-    size_t d_size = d_width * d_height * d_channels;
-    uint8_t d_pixels[d_size];
-    stbir_resize_uint8(frame.data, width, height, 0, d_pixels, d_width, d_height, 0, d_channels);
+        int32_t d_width = width / VIDEO_DOWNSCALE_FACTOR;
+        int32_t d_height = height / VIDEO_DOWNSCALE_FACTOR;
+        int32_t d_channels = 3;
+        size_t d_size = d_width * d_height * d_channels;
+        uint8_t d_pixels[d_size];
+        stbir_resize_uint8(frame.data, width, height, 0, d_pixels, d_width, d_height, 0, d_channels);
 
-    size_t d_size_padded = d_size + width * height;
-    uint8_t d_pixels_padded[d_size_padded];
+        size_t d_size_padded = d_size + width * height;
+        uint8_t d_pixels_padded[d_size_padded];
 
-    size_t currInd = 0;
-    for (int i = 0; i < d_size; i++) {
-        if (i % 4 == 3 && i != 0) {
-            d_pixels_padded[i] = 255;
-        } else {
-            d_pixels_padded[i] = d_pixels[currInd];
-            currInd += 1;
+        size_t currInd = 0;
+        for (int i = 0; i < d_size; i++) {
+            if (i % 4 == 3 && i != 0) {
+                d_pixels_padded[i] = 255;
+            } else {
+                d_pixels_padded[i] = d_pixels[currInd];
+                currInd += 1;
+            }
         }
+
+        inputTexture.fromImageFile(d_pixels_padded, d_size_padded, VK_FORMAT_R8G8B8A8_UNORM, d_width, d_height, engineDevice,
+                                   engineDevice.graphicsQueue(), VK_FILTER_LINEAR,
+                                   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_LAYOUT_GENERAL);
+    } else {
+        std::string inputFile = "../assets/haze.jpg";
+        size_t size;
+        int32_t width, height, channels;
+        loadImageFromFile(inputFile, nullptr, size, width, height, channels);
+        auto *pixels = new int8_t[size];
+        loadImageFromFile(inputFile, pixels, size, width, height, channels);
+
+        inputTexture.fromImageFile(pixels, size, VK_FORMAT_R8G8B8A8_UNORM, width, height, engineDevice,
+                                   engineDevice.graphicsQueue(), VK_FILTER_LINEAR,
+                                   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_LAYOUT_GENERAL);
     }
-
-
-    /*
-    std::string inputFile = fmt::format("../assets/img{}.jpg", frameIndex + 1);
-    size_t size;
-    int32_t width, height, channels;
-    loadImageFromFile(inputFile, nullptr, size, width, height, channels);
-    auto *pixels = new int8_t[size];
-    loadImageFromFile(inputFile, pixels, size, width, height, channels);
-    */
-
-    inputTexture.fromImageFile(d_pixels_padded, d_size_padded, VK_FORMAT_R8G8B8A8_UNORM, d_width, d_height, engineDevice,
-                               engineDevice.graphicsQueue(), VK_FILTER_LINEAR,
-                               VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_LAYOUT_GENERAL);
 }
 
 bool
@@ -543,7 +553,7 @@ void VulkanEngineEntryPoint::render() {
                                 0, 1, &compute.descriptorSet, 0,
                                 nullptr);
 
-        vkCmdDispatch(bufferPair.computeCommandBuffer, outputTexture.width / 16, outputTexture.height / 16, 1);
+        vkCmdDispatch(bufferPair.computeCommandBuffer, outputTexture.width / 1, outputTexture.height / 1, 1);
 
         // Record graphics commandBuffer
         renderer.beginSwapChainRenderPass(bufferPair.graphicsCommandBuffer, outputTexture.image);
@@ -586,13 +596,15 @@ void VulkanEngineEntryPoint::render() {
         renderer.endSwapChainRenderPass(bufferPair.graphicsCommandBuffer);
         renderer.endFrame();
 
-        vkQueueWaitIdle(engineDevice.graphicsQueue());
-        // Prepare next frame
-        frameIndex += 1;
-        fmt::print("Preparing frame {}\n", frameIndex);
-        inputTexture.destroy();
-        prepareInputImage();
-        updateComputeDescriptorSets();
+        if (PLAY_VIDEO) {
+            vkQueueWaitIdle(engineDevice.graphicsQueue());
+            // Prepare next frame
+            frameIndex += 1;
+            fmt::print("Preparing frame {}\n", frameIndex);
+            inputTexture.destroy();
+            prepareInputImage(PLAY_VIDEO);
+            updateComputeDescriptorSets();
+        }
     }
 }
 
@@ -620,6 +632,8 @@ void VulkanEngineEntryPoint::handleEvents() {
 
     if (keystate[SDL_SCANCODE_ESCAPE]) {
         isRunning = false;
+    } else if (keystate[SDL_SCANCODE_S]) {
+        saveScreenshot(fmt::format("../screenshots/screenshot_frame_{}.png", frameIndex).c_str());
     }
 }
 
@@ -647,4 +661,223 @@ void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
     };
     vkUpdateDescriptorSets(engineDevice.getDevice(), computeWriteDescriptorSets.size(),
                            computeWriteDescriptorSets.data(), 0, nullptr);
+}
+
+void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
+    bool supportsBlit = true;
+
+    // Check blit support for source and destination
+    VkFormatProperties formatProps;
+
+    // Check if the device supports blitting from optimal images (the swapchain images are in optimal format)
+    vkGetPhysicalDeviceFormatProperties(engineDevice.getPhysicalDevice(), renderer.getEngineSwapChain()->getSwapChainImageFormat(), &formatProps);
+    if (!(formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_BLIT_SRC_BIT)) {
+        std::cerr << "Device does not support blitting from optimal tiled images, using copy instead of blit!" << std::endl;
+        supportsBlit = false;
+    }
+
+    // Check if the device supports blitting to linear images
+    vkGetPhysicalDeviceFormatProperties(engineDevice.getPhysicalDevice(), VK_FORMAT_R8G8B8A8_UNORM, &formatProps);
+    if (!(formatProps.linearTilingFeatures & VK_FORMAT_FEATURE_BLIT_DST_BIT)) {
+        std::cerr << "Device does not support blitting to linear tiled images, using copy instead of blit!" << std::endl;
+        supportsBlit = false;
+    }
+
+    // Source for the copy is the last rendered swapchain image
+    VkImage srcImage = renderer.getEngineSwapChain()->getImage(0); //TODO: Find proper index
+    uint32_t width = renderer.getEngineSwapChain()->getSwapChainExtent().width;
+    uint32_t height = renderer.getEngineSwapChain()->getSwapChainExtent().height;
+    uint32_t channels = 4;
+    size_t size = width * height * channels;
+
+    // Create the linear tiled destination image to copy to and to read the memory from
+    VkImageCreateInfo imageCreateCI{};
+    imageCreateCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageCreateCI.imageType = VK_IMAGE_TYPE_2D;
+    // Note that vkCmdBlitImage (if supported) will also do format conversions if the swapchain color format would differ
+    imageCreateCI.format = VK_FORMAT_R8G8B8A8_UNORM;
+    imageCreateCI.extent.width = width;
+    imageCreateCI.extent.height = height;
+    imageCreateCI.extent.depth = 1;
+    imageCreateCI.arrayLayers = 1;
+    imageCreateCI.mipLevels = 1;
+    imageCreateCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageCreateCI.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageCreateCI.tiling = VK_IMAGE_TILING_LINEAR;
+    imageCreateCI.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    // Create the image
+    VkImage dstImage;
+    if (vkCreateImage(engineDevice.getDevice(), &imageCreateCI, nullptr, &dstImage) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create image for screenshot!");
+    }
+
+    // Create memory to back up the image
+    VkMemoryRequirements memRequirements;
+    VkMemoryAllocateInfo memAllocInfo{};
+    memAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    VkDeviceMemory dstImageMemory;
+    vkGetImageMemoryRequirements(engineDevice.getDevice(), dstImage, &memRequirements);
+    memAllocInfo.allocationSize = memRequirements.size;
+    // Memory must be host visible to copy from
+    memAllocInfo.memoryTypeIndex = engineDevice.findMemoryType(memRequirements.memoryTypeBits,
+                                                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    if (vkAllocateMemory(engineDevice.getDevice(), &memAllocInfo, nullptr, &dstImageMemory) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate memory for screenshot image!");
+    }
+
+    if (vkBindImageMemory(engineDevice.getDevice(), dstImage, dstImageMemory, 0) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to bind memory for screenshot image!");
+    }
+
+    // Do the actual blit from the swapchain image to our host visible destination image
+    VkCommandBuffer copyCmd = engineDevice.beginSingleTimeCommands();
+
+    // Transition destination image to transfer destination layout
+    insertImageMemoryBarrier(
+            copyCmd,
+            dstImage,
+            0,
+            VK_ACCESS_TRANSFER_WRITE_BIT,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VkImageSubresourceRange{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1});
+
+    // Transition swapchain image from present to transfer source layout
+    insertImageMemoryBarrier(
+            copyCmd,
+            srcImage,
+            VK_ACCESS_MEMORY_READ_BIT,
+            VK_ACCESS_TRANSFER_READ_BIT,
+            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VkImageSubresourceRange{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1});
+
+    // If source and destination support blit we'll blit as this also does automatic format conversion (e.g. from BGR to RGB)
+    if (supportsBlit) {
+        // Define the region to blit (we will blit the whole swapchain image)
+        VkOffset3D blitSize;
+        blitSize.x = width;
+        blitSize.y = height;
+        blitSize.z = 1;
+        VkImageBlit imageBlitRegion{};
+        imageBlitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        imageBlitRegion.srcSubresource.layerCount = 1;
+        imageBlitRegion.srcOffsets[1] = blitSize;
+        imageBlitRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        imageBlitRegion.dstSubresource.layerCount = 1;
+        imageBlitRegion.dstOffsets[1] = blitSize;
+
+        // Issue the blit command
+        vkCmdBlitImage(
+                copyCmd,
+                srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                1,
+                &imageBlitRegion,
+                VK_FILTER_NEAREST);
+    } else {
+        // Otherwise use image copy (requires us to manually flip components)
+        VkImageCopy imageCopyRegion{};
+        imageCopyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        imageCopyRegion.srcSubresource.layerCount = 1;
+        imageCopyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        imageCopyRegion.dstSubresource.layerCount = 1;
+        imageCopyRegion.extent.width = renderer.getEngineSwapChain()->getSwapChainExtent().width;
+        imageCopyRegion.extent.height = renderer.getEngineSwapChain()->getSwapChainExtent().height;
+        imageCopyRegion.extent.depth = 1;
+
+        // Issue the copy command
+        vkCmdCopyImage(
+                copyCmd,
+                srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                1,
+                &imageCopyRegion);
+    }
+
+    // Transition destination image to general layout, which is the required layout for mapping the image memory later on
+    insertImageMemoryBarrier(
+            copyCmd,
+            dstImage,
+            VK_ACCESS_TRANSFER_WRITE_BIT,
+            VK_ACCESS_MEMORY_READ_BIT,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VkImageSubresourceRange{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1});
+
+    // Transition back the swap chain image after the blit is done
+    insertImageMemoryBarrier(
+            copyCmd,
+            srcImage,
+            VK_ACCESS_TRANSFER_READ_BIT,
+            VK_ACCESS_MEMORY_READ_BIT,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VkImageSubresourceRange{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1});
+
+    engineDevice.endSingleTimeCommands(copyCmd, engineDevice.graphicsQueue());
+
+    // Get layout of the image (including row pitch)
+    VkImageSubresource subResource{VK_IMAGE_ASPECT_COLOR_BIT, 0, 0};
+    VkSubresourceLayout subResourceLayout;
+    vkGetImageSubresourceLayout(engineDevice.getDevice(), dstImage, &subResource, &subResourceLayout);
+
+    // Map image memory so we can start copying from it
+    const char *dataBgr;
+    vkMapMemory(engineDevice.getDevice(), dstImageMemory, 0, VK_WHOLE_SIZE, 0, (void **) &dataBgr);
+    dataBgr += subResourceLayout.offset;
+
+    char dataRgb[size];
+    for (size_t i = 0; i < size; i += channels) {
+        dataRgb[i + 0] = dataBgr[i + 2];
+        dataRgb[i + 1] = dataBgr[i + 1];
+        dataRgb[i + 2] = dataBgr[i + 0];
+        dataRgb[i + 3] = dataBgr[i + 3];
+    }
+
+    stbi_write_png(filename, width, height, channels, dataRgb, 0);
+
+    fmt::print("Screenshot saved to disk\n");
+
+    // Clean up resources
+    vkUnmapMemory(engineDevice.getDevice(), dstImageMemory);
+    vkFreeMemory(engineDevice.getDevice(), dstImageMemory, nullptr);
+    vkDestroyImage(engineDevice.getDevice(), dstImage, nullptr);
+}
+
+void VulkanEngineEntryPoint::insertImageMemoryBarrier(
+        VkCommandBuffer cmdbuffer,
+        VkImage image,
+        VkAccessFlags srcAccessMask,
+        VkAccessFlags dstAccessMask,
+        VkImageLayout oldImageLayout,
+        VkImageLayout newImageLayout,
+        VkPipelineStageFlags srcStageMask,
+        VkPipelineStageFlags dstStageMask,
+        VkImageSubresourceRange subresourceRange) {
+    VkImageMemoryBarrier imageMemoryBarrier = {};
+    imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    imageMemoryBarrier.srcAccessMask = srcAccessMask;
+    imageMemoryBarrier.dstAccessMask = dstAccessMask;
+    imageMemoryBarrier.oldLayout = oldImageLayout;
+    imageMemoryBarrier.newLayout = newImageLayout;
+    imageMemoryBarrier.image = image;
+    imageMemoryBarrier.subresourceRange = subresourceRange;
+
+    vkCmdPipelineBarrier(
+            cmdbuffer,
+            srcStageMask,
+            dstStageMask,
+            0,
+            0, nullptr,
+            0, nullptr,
+            1, &imageMemoryBarrier);
 }

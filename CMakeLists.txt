@@ -62,3 +62,4 @@ foreach(GLSL ${GLSL_SOURCE_FILES})
 endforeach(GLSL)
 
 add_custom_target(ComputeShaders DEPENDS ${SPIRV_BINARY_FILES})
+add_dependencies(${NAME} ComputeShaders)
