@@ -1,6 +1,6 @@
 #version 450
 
-layout (local_size_x = 1, local_size_y = 1) in;
+layout (local_size_x = 16, local_size_y = 16) in;
 layout (binding = 0, rgba8) uniform readonly image2D inputImage;
 layout (binding = 1, rgba8) uniform image2D resultImage;
 
@@ -8,16 +8,16 @@ const int kernelSize = 8;
 
 struct ImageData
 {
-    float pixels[kernelSize * kernelSize];
+    float pixels[kernelSize * kernelSize/ 4];
 } kernelMinChannels;
 
 void main()
 {
     // Fetch neighbouring texels
     int n = 0;
-    for (int i = -kernelSize; i <= kernelSize; ++i)
+    for (int i = -kernelSize / 2; i <= kernelSize / 2; ++i)
     {
-        for (int j = -kernelSize; j <= kernelSize; ++j)
+        for (int j = -kernelSize / 2; j <= kernelSize / 2; ++j)
         {
             vec3 rgb = imageLoad(inputImage, ivec2(gl_GlobalInvocationID.x + i, gl_GlobalInvocationID.y + j)).rgb;
 
@@ -27,7 +27,7 @@ void main()
     }
 
     float kernelMin = 1.0;
-    for (int i = 0; i < kernelSize * kernelSize; ++i) {
+    for (int i = 0; i < n; ++i) {
         if (kernelMinChannels.pixels[i] < kernelMin) {
             kernelMin = kernelMinChannels.pixels[i];
         }

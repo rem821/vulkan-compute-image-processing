@@ -553,7 +553,7 @@ void VulkanEngineEntryPoint::render() {
                                 0, 1, &compute.descriptorSet, 0,
                                 nullptr);
 
-        vkCmdDispatch(bufferPair.computeCommandBuffer, outputTexture.width / 1, outputTexture.height / 1, 1);
+        vkCmdDispatch(bufferPair.computeCommandBuffer, outputTexture.width / WORKGROUP_COUNT, outputTexture.height / WORKGROUP_COUNT, 1);
 
         // Record graphics commandBuffer
         renderer.beginSwapChainRenderPass(bufferPair.graphicsCommandBuffer, outputTexture.image);
@@ -672,14 +672,12 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
     // Check if the device supports blitting from optimal images (the swapchain images are in optimal format)
     vkGetPhysicalDeviceFormatProperties(engineDevice.getPhysicalDevice(), renderer.getEngineSwapChain()->getSwapChainImageFormat(), &formatProps);
     if (!(formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_BLIT_SRC_BIT)) {
-        std::cerr << "Device does not support blitting from optimal tiled images, using copy instead of blit!" << std::endl;
         supportsBlit = false;
     }
 
     // Check if the device supports blitting to linear images
     vkGetPhysicalDeviceFormatProperties(engineDevice.getPhysicalDevice(), VK_FORMAT_R8G8B8A8_UNORM, &formatProps);
     if (!(formatProps.linearTilingFeatures & VK_FORMAT_FEATURE_BLIT_DST_BIT)) {
-        std::cerr << "Device does not support blitting to linear tiled images, using copy instead of blit!" << std::endl;
         supportsBlit = false;
     }
 

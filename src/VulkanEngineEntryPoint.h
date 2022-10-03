@@ -22,6 +22,7 @@
 #define VIDEO_PATH "../assets/video.mp4"
 #define VIDEO_DOWNSCALE_FACTOR 1
 #define SHADER_NAME "DarkChannelPrior"
+#define WORKGROUP_COUNT 16
 #define PLAY_VIDEO false
 
 struct Vertex {
