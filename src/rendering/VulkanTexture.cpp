@@ -39,8 +39,11 @@ void Texture::destroy() {
 * @param (Optional) imageUsageFlags Usage flags for the texture's image (defaults to VK_IMAGE_USAGE_SAMPLED_BIT)
 * @param (Optional) imageLayout Usage layout for the texture (defaults VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
 */
-void Texture2D::fromImageFile(void *buffer, VkDeviceSize bufferSize, VkFormat format, uint32_t texWidth, uint32_t texHeight, VulkanEngineDevice &device,
-                              VkQueue copyQueue, VkFilter filter, VkImageUsageFlags imageUsageFlags, VkImageLayout imageLayout) {
+void
+Texture2D::fromImageFile(void *buffer, VkDeviceSize bufferSize, VkFormat format, uint32_t texWidth, uint32_t texHeight,
+                         VulkanEngineDevice &device,
+                         VkQueue copyQueue, VkFilter filter, VkImageUsageFlags imageUsageFlags,
+                         VkImageLayout imageLayout) {
     assert(buffer);
 
     this->device = &device;
@@ -75,7 +78,8 @@ void Texture2D::fromImageFile(void *buffer, VkDeviceSize bufferSize, VkFormat fo
 
     memAllocInfo.allocationSize = memReqs.size;
     // Get memory type index for a host visible buffer
-    memAllocInfo.memoryTypeIndex = device.findMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    memAllocInfo.memoryTypeIndex = device.findMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                                                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     if (vkAllocateMemory(device.getDevice(), &memAllocInfo, nullptr, &stagingMemory) != VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate staging buffer memory for the texture!");
@@ -199,7 +203,7 @@ void Texture2D::fromImageFile(void *buffer, VkDeviceSize bufferSize, VkFormat fo
     viewCreateInfo.pNext = NULL;
     viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     viewCreateInfo.format = format;
-    viewCreateInfo.components = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A};
+    viewCreateInfo.components = {VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_R,VK_COMPONENT_SWIZZLE_A}; // Swizzle color components here as videos are read in BGRA
     viewCreateInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     viewCreateInfo.subresourceRange.levelCount = 1;
     viewCreateInfo.image = image;
@@ -213,7 +217,6 @@ void Texture2D::fromImageFile(void *buffer, VkDeviceSize bufferSize, VkFormat fo
 
 void Texture2D::createTextureTarget(VulkanEngineDevice &engineDevice, Texture2D inputTexture) {
     VkFormatProperties formatProperties;
-
 
     // Get device properties for the requested texture format
     vkGetPhysicalDeviceFormatProperties(engineDevice.getPhysicalDevice(), VK_FORMAT_R8G8B8A8_UNORM, &formatProperties);
@@ -230,7 +233,9 @@ void Texture2D::createTextureTarget(VulkanEngineDevice &engineDevice, Texture2D 
     imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
     imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-    imageCreateInfo.extent = {inputTexture.width, inputTexture.height, 1};
+    imageCreateInfo.extent.width = inputTexture.width;
+    imageCreateInfo.extent.height = inputTexture.height;
+    imageCreateInfo.extent.depth = 1;
     imageCreateInfo.mipLevels = 1;
     imageCreateInfo.arrayLayers = 1;
     imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -262,7 +267,8 @@ void Texture2D::createTextureTarget(VulkanEngineDevice &engineDevice, Texture2D 
 
     vkGetImageMemoryRequirements(engineDevice.getDevice(), image, &memReqs);
     memAllocInfo.allocationSize = memReqs.size;
-    memAllocInfo.memoryTypeIndex = engineDevice.findMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    memAllocInfo.memoryTypeIndex = engineDevice.findMemoryType(memReqs.memoryTypeBits,
+                                                               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     if (vkAllocateMemory(engineDevice.getDevice(), &memAllocInfo, nullptr, &deviceMemory) != VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate memory for outputTexture!");
     }
@@ -273,12 +279,7 @@ void Texture2D::createTextureTarget(VulkanEngineDevice &engineDevice, Texture2D 
     VkCommandBuffer layoutCmd = engineDevice.beginSingleTimeCommands();
 
     imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    setImageLayout(
-            layoutCmd,
-            image,
-            VK_IMAGE_ASPECT_COLOR_BIT,
-            VK_IMAGE_LAYOUT_UNDEFINED,
-            imageLayout);
+    setImageLayout(layoutCmd, image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, imageLayout);
 
     engineDevice.endSingleTimeCommands(layoutCmd, engineDevice.graphicsQueue());
 
@@ -295,7 +296,7 @@ void Texture2D::createTextureTarget(VulkanEngineDevice &engineDevice, Texture2D 
     sampler.maxAnisotropy = 1.0f;
     sampler.compareOp = VK_COMPARE_OP_NEVER;
     sampler.minLod = 0.0f;
-    sampler.maxLod = mipLevels;
+    sampler.maxLod = (float) mipLevels;
     sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
     if (vkCreateSampler(engineDevice.getDevice(), &sampler, nullptr, &this->sampler) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create sampler for outputTexture!");
@@ -307,7 +308,7 @@ void Texture2D::createTextureTarget(VulkanEngineDevice &engineDevice, Texture2D 
     view.image = VK_NULL_HANDLE;
     view.viewType = VK_IMAGE_VIEW_TYPE_2D;
     view.format = VK_FORMAT_R8G8B8A8_UNORM;
-    view.components = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A};
+    view.components = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A}; // Here it doesn't matter rn as the output is usually BW
     view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     view.image = image;
     if (vkCreateImageView(engineDevice.getDevice(), &view, nullptr, &this->view) != VK_SUCCESS) {

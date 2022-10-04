@@ -15,15 +15,16 @@
 
 #include "glm/glm.hpp"
 
-#define WINDOW_WIDTH 1920
-#define WINDOW_HEIGHT 1080
-#define WINDOW_TITLE "Vulkan Compute Render Window"
-//#define VIDEO_PATH "/home/standa/3_1_1_1/camera_ir/video.mp4"
-#define VIDEO_PATH "../assets/video.mp4"
 #define VIDEO_DOWNSCALE_FACTOR 1
-#define SHADER_NAME "DarkChannelPrior"
+#define WINDOW_WIDTH int(1920 / VIDEO_DOWNSCALE_FACTOR)
+#define WINDOW_HEIGHT int(700 / VIDEO_DOWNSCALE_FACTOR)
+#define WINDOW_TITLE "Vulkan Compute Render Window"
+#define IMAGE_PATH "../assets/image.png"
+#define VIDEO_PATH "/home/standa/3_1_1_1/camera_left_front/video.mp4"
+//#define VIDEO_PATH "../assets/video.mp4"
+#define SHADER_NAME "emboss"
 #define WORKGROUP_COUNT 16
-#define PLAY_VIDEO false
+#define PLAY_VIDEO true
 
 struct Vertex {
     float pos[3];
@@ -43,29 +44,27 @@ public:
         glm::mat4 modelView;
     } uboVS;
 
-    // Resources for the graphics part of the example
     struct {
-        VkDescriptorSetLayout descriptorSetLayout;    // Image display shader binding layout
-        VkDescriptorSet descriptorSetPreCompute;    // Image display shader bindings before compute shader image manipulation
-        VkDescriptorSet descriptorSetPostCompute;    // Image display shader bindings after compute shader image manipulation
-        VkPipeline pipeline;                        // Image display pipeline
-        VkPipelineLayout pipelineLayout;            // Layout of the graphics pipeline
+        VkDescriptorSetLayout descriptorSetLayout;
+        VkDescriptorSet descriptorSetPreCompute;
+        VkDescriptorSet descriptorSetPostCompute;
+        VkPipeline pipeline;
+        VkPipelineLayout pipelineLayout;
     } graphics;
 
-    // Resources for the compute part of the example
     struct Compute {
-        VkDescriptorSetLayout descriptorSetLayout;    // Compute shader binding layout
-        VkDescriptorSet descriptorSet;                // Compute shader bindings
-        VkPipelineLayout pipelineLayout;            // Layout of the compute pipeline
-        std::vector<VkPipeline> pipelines;            // Compute pipelines for image filters
-        int32_t pipelineIndex = 0;                    // Current image filtering compute pipeline index
+        VkDescriptorSetLayout descriptorSetLayout;
+        VkDescriptorSet descriptorSet;
+        VkPipelineLayout pipelineLayout;
+        std::vector<VkPipeline> pipelines;
+        int32_t pipelineIndex = 0;
     } compute;
 
     VulkanEngineEntryPoint();
     ~VulkanEngineEntryPoint();
 
-    void prepareInputImage(bool playVideo);
-    bool loadImageFromFile(const std::string& file, void *pixels, size_t &size, int &width, int &height, int &channels);
+    void prepareInputImage();
+    static bool loadImageFromFile(const std::string& file, void *pixels, size_t &size, int &width, int &height, int &channels);
     void generateQuad();
     void setupVertexDescriptions();
     void prepareUniformBuffers();
@@ -79,13 +78,10 @@ public:
     void render();
     void handleEvents();
 
-    void updateComputeDescriptorSets();
-
     void saveScreenshot(const char *filename);
 
     bool isRunning = false;
     uint32_t frameIndex = 0;
-    uint32_t totalFrames = -1;
 private:
 
     VkPipelineShaderStageCreateInfo loadShader(std::string fileName, VkShaderStageFlagBits stage);
@@ -109,6 +105,7 @@ private:
     Camera camera{};
 
     cv::VideoCapture video{VIDEO_PATH };
+    double totalFrames = video.get(cv::CAP_PROP_FRAME_COUNT);
 
     Texture2D inputTexture;
     Texture2D outputTexture;

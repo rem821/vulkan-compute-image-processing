@@ -1,34 +1,27 @@
 //
 // Created by Stanislav Svědiroh on 27.09.2022.
 //
-#include "VulkanEngineEntryPoint.h"
-#include <vulkan/vulkan.hpp>
-
 #define STB_IMAGE_IMPLEMENTATION
-
-#include "../external/stb/stb_image.h"
-
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
-
-#include "../external/stb/stb_image_resize.h"
-
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
+#include "VulkanEngineEntryPoint.h"
+
+#include "../external/stb/stb_image.h"
+#include "../external/stb/stb_image_resize.h"
 #include "../external/stb/stb_image_write.h"
-
-
+#include <vulkan/vulkan.hpp>
 #include <fmt/core.h>
-
+#include <vector>
 
 VulkanEngineEntryPoint::VulkanEngineEntryPoint() {
-    prepareInputImage(PLAY_VIDEO);
-    generateQuad();
-    setupVertexDescriptions();
-
     camera.setViewYXZ(glm::vec3(0.0f, 0.0f, -2.0f), glm::vec3(0.0f));
-    camera.setPerspectiveProjection(glm::radians(60.f), (float) WINDOW_WIDTH * 0.5f / (float) WINDOW_HEIGHT, 1.0f,
+    camera.setPerspectiveProjection(glm::radians(55.f), (float) WINDOW_WIDTH * 0.27f / (float) WINDOW_HEIGHT, 1.0f,
                                     256.0f);
 
+    prepareInputImage();
+    generateQuad();
+    setupVertexDescriptions();
     prepareUniformBuffers();
     outputTexture.createTextureTarget(engineDevice, inputTexture);
     setupDescriptorSetLayout();
@@ -40,54 +33,58 @@ VulkanEngineEntryPoint::VulkanEngineEntryPoint() {
     isRunning = true;
 }
 
-VulkanEngineEntryPoint::~VulkanEngineEntryPoint() {
+VulkanEngineEntryPoint::~VulkanEngineEntryPoint() = default;
 
-}
-
-void VulkanEngineEntryPoint::prepareInputImage(bool playVideo) {
-    if (playVideo) {
+void VulkanEngineEntryPoint::prepareInputImage() {
+    if (PLAY_VIDEO && frameIndex < totalFrames) {
         cv::Mat frame;
         video.read(frame);
 
         int32_t width = frame.cols;
         int32_t height = frame.rows;
-        int32_t channels = 4;
-        size_t size = width * height * channels;
 
+        // Downscale the video according to VIDEO_DOWNSCALE_FACTOR
         int32_t d_width = width / VIDEO_DOWNSCALE_FACTOR;
         int32_t d_height = height / VIDEO_DOWNSCALE_FACTOR;
         int32_t d_channels = 3;
         size_t d_size = d_width * d_height * d_channels;
-        uint8_t d_pixels[d_size];
+        auto *d_pixels = new uint8_t[d_size];
         stbir_resize_uint8(frame.data, width, height, 0, d_pixels, d_width, d_height, 0, d_channels);
 
-        size_t d_size_padded = d_size + width * height;
-        uint8_t d_pixels_padded[d_size_padded];
+        size_t d_size_rgba = d_width * d_height * 4;
+        auto *d_pixels_rgba = new uint8_t[d_size_rgba];
 
+        // Convert from RGB to RGBA
         size_t currInd = 0;
         for (int i = 0; i < d_size; i++) {
             if (i % 4 == 3 && i != 0) {
-                d_pixels_padded[i] = 255;
+                d_pixels_rgba[i] = 255;
             } else {
-                d_pixels_padded[i] = d_pixels[currInd];
+                d_pixels_rgba[i] = d_pixels[currInd];
                 currInd += 1;
             }
         }
 
-        inputTexture.fromImageFile(d_pixels_padded, d_size_padded, VK_FORMAT_R8G8B8A8_UNORM, d_width, d_height, engineDevice,
+        inputTexture.fromImageFile(d_pixels_rgba, d_size_rgba, VK_FORMAT_R8G8B8_UNORM, d_width, d_height,
+                                   engineDevice,
                                    engineDevice.graphicsQueue(), VK_FILTER_LINEAR,
                                    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_LAYOUT_GENERAL);
+
+        delete[] d_pixels;
+        delete[] d_pixels_rgba;
     } else {
-        std::string inputFile = "../assets/haze.jpg";
         size_t size;
         int32_t width, height, channels;
-        loadImageFromFile(inputFile, nullptr, size, width, height, channels);
+        loadImageFromFile(IMAGE_PATH, nullptr, size, width, height, channels);
+
         auto *pixels = new int8_t[size];
-        loadImageFromFile(inputFile, pixels, size, width, height, channels);
+        loadImageFromFile(IMAGE_PATH, pixels, size, width, height, channels);
 
         inputTexture.fromImageFile(pixels, size, VK_FORMAT_R8G8B8A8_UNORM, width, height, engineDevice,
                                    engineDevice.graphicsQueue(), VK_FILTER_LINEAR,
                                    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_LAYOUT_GENERAL);
+
+        delete[] pixels;
     }
 }
 
@@ -111,7 +108,7 @@ VulkanEngineEntryPoint::loadImageFromFile(const std::string &file, void *pixels,
 // Setup vertices for a single uv-mapped quad
 void VulkanEngineEntryPoint::generateQuad() {
     // Setup vertices for a single uv-mapped quad made from two triangles
-    std::vector<Vertex> vertices =
+    std::vector<Vertex> _vertices =
             {
                     {{1.0f,  1.0f,  0.0f}, {1.0f, 1.0f}},
                     {{-1.0f, 1.0f,  0.0f}, {0.0f, 1.0f}},
@@ -125,13 +122,13 @@ void VulkanEngineEntryPoint::generateQuad() {
 
 
     // Vertex buffer
-    vertexBuffer = std::make_unique<VulkanEngineBuffer>(engineDevice, sizeof(Vertex), vertices.size(),
+    vertexBuffer = std::make_unique<VulkanEngineBuffer>(engineDevice, sizeof(Vertex), _vertices.size(),
                                                         VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                                                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     vertexBuffer->map();
-    vertexBuffer->writeToBuffer((void *) vertices.data());
+    vertexBuffer->writeToBuffer((void *) _vertices.data());
 
 
     // Index buffer
@@ -297,7 +294,7 @@ void VulkanEngineEntryPoint::preparePipelines() {
 
     // Rendering pipeline
     // Load shaders
-    std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
+    std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages{};
 
     shaderStages[0] = loadShader("../shaders/texture.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     shaderStages[1] = loadShader("../shaders/texture.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -409,7 +406,7 @@ void VulkanEngineEntryPoint::setupDescriptorSet() {
     allocInfo.pSetLayouts = &graphics.descriptorSetLayout;
     allocInfo.descriptorSetCount = 1;
 
-    // Input image (before compute post processing)
+    // Input image (before compute post-processing)
     if (vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPreCompute) !=
         VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate pre-compute descriptor set!");
@@ -521,7 +518,29 @@ void VulkanEngineEntryPoint::prepareCompute() {
         throw std::runtime_error("Failed to allocate descriptor sets for compute!");
     }
 
-    updateComputeDescriptorSets();
+    VkWriteDescriptorSet inputImageDescriptorSet{};
+    inputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    inputImageDescriptorSet.dstSet = compute.descriptorSet;
+    inputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    inputImageDescriptorSet.dstBinding = 0;
+    inputImageDescriptorSet.pImageInfo = &inputTexture.descriptor;
+    inputImageDescriptorSet.descriptorCount = 1;
+
+    VkWriteDescriptorSet outputImageDescriptorSet{};
+    outputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    outputImageDescriptorSet.dstSet = compute.descriptorSet;
+    outputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    outputImageDescriptorSet.dstBinding = 1;
+    outputImageDescriptorSet.pImageInfo = &outputTexture.descriptor;
+    outputImageDescriptorSet.descriptorCount = 1;
+
+
+    std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets = {
+            inputImageDescriptorSet,
+            outputImageDescriptorSet
+    };
+    vkUpdateDescriptorSets(engineDevice.getDevice(), computeWriteDescriptorSets.size(),
+                           computeWriteDescriptorSets.data(), 0, nullptr);
 
     // Create compute shader pipelines
     VkComputePipelineCreateInfo computePipelineCreateInfo{};
@@ -553,7 +572,8 @@ void VulkanEngineEntryPoint::render() {
                                 0, 1, &compute.descriptorSet, 0,
                                 nullptr);
 
-        vkCmdDispatch(bufferPair.computeCommandBuffer, outputTexture.width / WORKGROUP_COUNT, outputTexture.height / WORKGROUP_COUNT, 1);
+        vkCmdDispatch(bufferPair.computeCommandBuffer, outputTexture.width / WORKGROUP_COUNT,
+                      outputTexture.height / WORKGROUP_COUNT, 1);
 
         // Record graphics commandBuffer
         renderer.beginSwapChainRenderPass(bufferPair.graphicsCommandBuffer, outputTexture.image);
@@ -602,8 +622,7 @@ void VulkanEngineEntryPoint::render() {
             frameIndex += 1;
             fmt::print("Preparing frame {}\n", frameIndex);
             inputTexture.destroy();
-            prepareInputImage(PLAY_VIDEO);
-            updateComputeDescriptorSets();
+            prepareInputImage();
         }
     }
 }
@@ -637,32 +656,6 @@ void VulkanEngineEntryPoint::handleEvents() {
     }
 }
 
-void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
-    VkWriteDescriptorSet inputImageDescriptorSet{};
-    inputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    inputImageDescriptorSet.dstSet = compute.descriptorSet;
-    inputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    inputImageDescriptorSet.dstBinding = 0;
-    inputImageDescriptorSet.pImageInfo = &inputTexture.descriptor;
-    inputImageDescriptorSet.descriptorCount = 1;
-
-    VkWriteDescriptorSet outputImageDescriptorSet{};
-    outputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    outputImageDescriptorSet.dstSet = compute.descriptorSet;
-    outputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    outputImageDescriptorSet.dstBinding = 1;
-    outputImageDescriptorSet.pImageInfo = &outputTexture.descriptor;
-    outputImageDescriptorSet.descriptorCount = 1;
-
-
-    std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets = {
-            inputImageDescriptorSet,
-            outputImageDescriptorSet
-    };
-    vkUpdateDescriptorSets(engineDevice.getDevice(), computeWriteDescriptorSets.size(),
-                           computeWriteDescriptorSets.data(), 0, nullptr);
-}
-
 void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
     bool supportsBlit = true;
 
@@ -670,7 +663,8 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
     VkFormatProperties formatProps;
 
     // Check if the device supports blitting from optimal images (the swapchain images are in optimal format)
-    vkGetPhysicalDeviceFormatProperties(engineDevice.getPhysicalDevice(), renderer.getEngineSwapChain()->getSwapChainImageFormat(), &formatProps);
+    vkGetPhysicalDeviceFormatProperties(engineDevice.getPhysicalDevice(),
+                                        renderer.getEngineSwapChain()->getSwapChainImageFormat(), &formatProps);
     if (!(formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_BLIT_SRC_BIT)) {
         supportsBlit = false;
     }
@@ -718,7 +712,8 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
     memAllocInfo.allocationSize = memRequirements.size;
     // Memory must be host visible to copy from
     memAllocInfo.memoryTypeIndex = engineDevice.findMemoryType(memRequirements.memoryTypeBits,
-                                                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+                                                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     if (vkAllocateMemory(engineDevice.getDevice(), &memAllocInfo, nullptr, &dstImageMemory) != VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate memory for screenshot image!");
     }
