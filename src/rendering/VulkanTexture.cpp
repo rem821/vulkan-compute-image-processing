@@ -16,13 +16,18 @@ void Texture::updateDescriptor() {
     descriptor.imageLayout = imageLayout;
 }
 
-void Texture::destroy() {
-    vkDestroyImageView(device->getDevice(), view, nullptr);
-    vkDestroyImage(device->getDevice(), image, nullptr);
+void Texture::destroy(VulkanEngineDevice &device) {
+    vkDestroyImageView(device.getDevice(), view, nullptr);
+    view = nullptr;
+    vkDestroyImage(device.getDevice(), image, nullptr);
+    image = nullptr;
     if (sampler) {
-        vkDestroySampler(device->getDevice(), sampler, nullptr);
+        vkDestroySampler(device.getDevice(), sampler, nullptr);
+        sampler = nullptr;
     }
-    vkFreeMemory(device->getDevice(), deviceMemory, nullptr);
+    vkFreeMemory(device.getDevice(), deviceMemory, nullptr);
+    imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    deviceMemory = nullptr;
 }
 
 /**
@@ -46,7 +51,6 @@ Texture2D::fromImageFile(void *buffer, VkDeviceSize bufferSize, VkFormat format,
                          VkImageLayout imageLayout) {
     assert(buffer);
 
-    this->device = &device;
     width = texWidth;
     height = texHeight;
     mipLevels = 1;
@@ -203,7 +207,7 @@ Texture2D::fromImageFile(void *buffer, VkDeviceSize bufferSize, VkFormat format,
     viewCreateInfo.pNext = NULL;
     viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     viewCreateInfo.format = format;
-    viewCreateInfo.components = {VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_R,VK_COMPONENT_SWIZZLE_A}; // Swizzle color components here as videos are read in BGRA
+    viewCreateInfo.components = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B,VK_COMPONENT_SWIZZLE_A};
     viewCreateInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     viewCreateInfo.subresourceRange.levelCount = 1;
     viewCreateInfo.image = image;
@@ -224,7 +228,6 @@ void Texture2D::createTextureTarget(VulkanEngineDevice &engineDevice, Texture2D 
     assert(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT);
 
     // Prepare blit target texture
-    this->device = device;
     width = inputTexture.width;
     height = inputTexture.height;
     mipLevels = 1;
@@ -319,5 +322,4 @@ void Texture2D::createTextureTarget(VulkanEngineDevice &engineDevice, Texture2D 
     descriptor.imageLayout = imageLayout;
     descriptor.imageView = this->view;
     descriptor.sampler = this->sampler;
-    device = &engineDevice;
 }

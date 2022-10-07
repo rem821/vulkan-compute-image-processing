@@ -15,14 +15,14 @@
 
 #include "glm/glm.hpp"
 
-#define VIDEO_DOWNSCALE_FACTOR 1
+#define VIDEO_DOWNSCALE_FACTOR 2
 #define WINDOW_WIDTH int(1920 / VIDEO_DOWNSCALE_FACTOR)
 #define WINDOW_HEIGHT int(700 / VIDEO_DOWNSCALE_FACTOR)
 #define WINDOW_TITLE "Vulkan Compute Render Window"
-#define IMAGE_PATH "../assets/image.png"
-#define VIDEO_PATH "/home/standa/3_1_1_1/camera_left_front/video.mp4"
-//#define VIDEO_PATH "../assets/video.mp4"
-#define SHADER_NAME "emboss"
+#define IMAGE_PATH "../assets/haze.jpg"
+//#define VIDEO_PATH "/home/standa/3_1_1_1/camera_left_front/video.mp4"
+#define VIDEO_PATH "../assets/video.mp4"
+#define SHADER_NAME "DarkChannelPrior"
 #define WORKGROUP_COUNT 16
 #define PLAY_VIDEO true
 
@@ -74,6 +74,9 @@ public:
     void setupDescriptorPool();
     void setupDescriptorSet();
     void prepareCompute();
+
+    void updateComputeDescriptorSets();
+    void updateGraphicsDescriptorSets();
 
     void render();
     void handleEvents();

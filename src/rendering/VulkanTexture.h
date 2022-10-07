@@ -20,7 +20,6 @@
 class Texture
 {
   public:
-	VulkanEngineDevice    *device;
 	VkImage               image;
 	VkImageLayout         imageLayout;
 	VkDeviceMemory        deviceMemory;
@@ -32,13 +31,13 @@ class Texture
 	VkSampler             sampler;
 
 	void      updateDescriptor();
-	void      destroy();
+	void      destroy(VulkanEngineDevice &device);
 };
 
 class Texture2D : public Texture
 {
   public:
-	void fromImageFile(
+    void fromImageFile(
 	    void *             buffer,
 	    VkDeviceSize       bufferSize,
 	    VkFormat           format,

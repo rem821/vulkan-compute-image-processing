@@ -37,6 +37,10 @@ VulkanEngineEntryPoint::~VulkanEngineEntryPoint() = default;
 
 void VulkanEngineEntryPoint::prepareInputImage() {
     if (PLAY_VIDEO && frameIndex < totalFrames) {
+        if (inputTexture.image != nullptr) {
+            inputTexture.destroy(engineDevice);
+        }
+
         cv::Mat frame;
         video.read(frame);
 
@@ -51,21 +55,19 @@ void VulkanEngineEntryPoint::prepareInputImage() {
         auto *d_pixels = new uint8_t[d_size];
         stbir_resize_uint8(frame.data, width, height, 0, d_pixels, d_width, d_height, 0, d_channels);
 
+        // Convert from BGR to RGBA
+        size_t currInd = 0;
         size_t d_size_rgba = d_width * d_height * 4;
         auto *d_pixels_rgba = new uint8_t[d_size_rgba];
-
-        // Convert from RGB to RGBA
-        size_t currInd = 0;
-        for (int i = 0; i < d_size; i++) {
-            if (i % 4 == 3 && i != 0) {
-                d_pixels_rgba[i] = 255;
-            } else {
-                d_pixels_rgba[i] = d_pixels[currInd];
-                currInd += 1;
-            }
+        for (size_t i = 0; i < d_size_rgba; i += 4) {
+            d_pixels_rgba[i + 0] = d_pixels[currInd + 2];
+            d_pixels_rgba[i + 1] = d_pixels[currInd + 1];
+            d_pixels_rgba[i + 2] = d_pixels[currInd + 0];
+            d_pixels_rgba[i + 3] = 255;
+            currInd += 3;
         }
 
-        inputTexture.fromImageFile(d_pixels_rgba, d_size_rgba, VK_FORMAT_R8G8B8_UNORM, d_width, d_height,
+        inputTexture.fromImageFile(d_pixels_rgba, d_size_rgba, VK_FORMAT_R8G8B8A8_UNORM, d_width, d_height,
                                    engineDevice,
                                    engineDevice.graphicsQueue(), VK_FILTER_LINEAR,
                                    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_LAYOUT_GENERAL);
@@ -412,28 +414,7 @@ void VulkanEngineEntryPoint::setupDescriptorSet() {
         throw std::runtime_error("Failed to allocate pre-compute descriptor set!");
     }
 
-    VkWriteDescriptorSet uniformDescriptorSet{};
-    uniformDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    uniformDescriptorSet.dstSet = graphics.descriptorSetPreCompute;
-    uniformDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uniformDescriptorSet.dstBinding = 0;
-    uniformDescriptorSet.pBufferInfo = &uniformBufferVS->getBufferInfo();
-    uniformDescriptorSet.descriptorCount = 1;
-
-    VkWriteDescriptorSet imageDescriptorSet{};
-    imageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    imageDescriptorSet.dstSet = graphics.descriptorSetPreCompute;
-    imageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    imageDescriptorSet.dstBinding = 1;
-    imageDescriptorSet.pImageInfo = &inputTexture.descriptor;
-    imageDescriptorSet.descriptorCount = 1;
-
-    std::vector<VkWriteDescriptorSet> baseImageWriteDescriptorSets = {
-            uniformDescriptorSet,
-            imageDescriptorSet
-    };
-    vkUpdateDescriptorSets(engineDevice.getDevice(), baseImageWriteDescriptorSets.size(),
-                           baseImageWriteDescriptorSets.data(), 0, nullptr);
+    updateGraphicsDescriptorSets();
 
     // Final image (after compute shader processing)
     if (vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPostCompute) !=
@@ -518,29 +499,7 @@ void VulkanEngineEntryPoint::prepareCompute() {
         throw std::runtime_error("Failed to allocate descriptor sets for compute!");
     }
 
-    VkWriteDescriptorSet inputImageDescriptorSet{};
-    inputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    inputImageDescriptorSet.dstSet = compute.descriptorSet;
-    inputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    inputImageDescriptorSet.dstBinding = 0;
-    inputImageDescriptorSet.pImageInfo = &inputTexture.descriptor;
-    inputImageDescriptorSet.descriptorCount = 1;
-
-    VkWriteDescriptorSet outputImageDescriptorSet{};
-    outputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    outputImageDescriptorSet.dstSet = compute.descriptorSet;
-    outputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    outputImageDescriptorSet.dstBinding = 1;
-    outputImageDescriptorSet.pImageInfo = &outputTexture.descriptor;
-    outputImageDescriptorSet.descriptorCount = 1;
-
-
-    std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets = {
-            inputImageDescriptorSet,
-            outputImageDescriptorSet
-    };
-    vkUpdateDescriptorSets(engineDevice.getDevice(), computeWriteDescriptorSets.size(),
-                           computeWriteDescriptorSets.data(), 0, nullptr);
+    updateComputeDescriptorSets();
 
     // Create compute shader pipelines
     VkComputePipelineCreateInfo computePipelineCreateInfo{};
@@ -621,8 +580,9 @@ void VulkanEngineEntryPoint::render() {
             // Prepare next frame
             frameIndex += 1;
             fmt::print("Preparing frame {}\n", frameIndex);
-            inputTexture.destroy();
             prepareInputImage();
+            updateComputeDescriptorSets();
+            updateGraphicsDescriptorSets();
         }
     }
 }
@@ -654,6 +614,57 @@ void VulkanEngineEntryPoint::handleEvents() {
     } else if (keystate[SDL_SCANCODE_S]) {
         saveScreenshot(fmt::format("../screenshots/screenshot_frame_{}.png", frameIndex).c_str());
     }
+}
+
+void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
+    VkWriteDescriptorSet inputImageDescriptorSet{};
+    inputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    inputImageDescriptorSet.dstSet = compute.descriptorSet;
+    inputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    inputImageDescriptorSet.dstBinding = 0;
+    inputImageDescriptorSet.pImageInfo = &inputTexture.descriptor;
+    inputImageDescriptorSet.descriptorCount = 1;
+
+    VkWriteDescriptorSet outputImageDescriptorSet{};
+    outputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    outputImageDescriptorSet.dstSet = compute.descriptorSet;
+    outputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    outputImageDescriptorSet.dstBinding = 1;
+    outputImageDescriptorSet.pImageInfo = &outputTexture.descriptor;
+    outputImageDescriptorSet.descriptorCount = 1;
+
+
+    std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets = {
+            inputImageDescriptorSet,
+            outputImageDescriptorSet
+    };
+    vkUpdateDescriptorSets(engineDevice.getDevice(), computeWriteDescriptorSets.size(),
+                           computeWriteDescriptorSets.data(), 0, nullptr);
+}
+
+void VulkanEngineEntryPoint::updateGraphicsDescriptorSets() {
+    VkWriteDescriptorSet uniformDescriptorSet{};
+    uniformDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    uniformDescriptorSet.dstSet = graphics.descriptorSetPreCompute;
+    uniformDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uniformDescriptorSet.dstBinding = 0;
+    uniformDescriptorSet.pBufferInfo = &uniformBufferVS->getBufferInfo();
+    uniformDescriptorSet.descriptorCount = 1;
+
+    VkWriteDescriptorSet imageDescriptorSet{};
+    imageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    imageDescriptorSet.dstSet = graphics.descriptorSetPreCompute;
+    imageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    imageDescriptorSet.dstBinding = 1;
+    imageDescriptorSet.pImageInfo = &inputTexture.descriptor;
+    imageDescriptorSet.descriptorCount = 1;
+
+    std::vector<VkWriteDescriptorSet> baseImageWriteDescriptorSets = {
+            uniformDescriptorSet,
+            imageDescriptorSet
+    };
+    vkUpdateDescriptorSets(engineDevice.getDevice(), baseImageWriteDescriptorSets.size(),
+                           baseImageWriteDescriptorSets.data(), 0, nullptr);
 }
 
 void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
