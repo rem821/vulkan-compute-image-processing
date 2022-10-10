@@ -42,6 +42,7 @@ public:
     struct {
         glm::mat4 projection;
         glm::mat4 modelView;
+        glm::vec2 imageSize;
     } uboVS;
 
     struct {
@@ -74,6 +75,9 @@ public:
     void setupDescriptorPool();
     void setupDescriptorSet();
     void prepareCompute();
+
+    void updateComputeDescriptorSets();
+    void updateGraphicsDescriptorSets();
 
     void render();
     void handleEvents();
