@@ -43,7 +43,10 @@ void VulkanEngineEntryPoint::prepareInputImage() {
         }
 
         cv::Mat frame;
-        video.read(frame);
+        while(lastReadFrame < frameIndex) {
+            video.read(frame);
+            lastReadFrame += 1;
+        }
 
         int32_t width = frame.cols;
         int32_t height = frame.rows;
@@ -618,6 +621,14 @@ void VulkanEngineEntryPoint::handleEvents() {
         isRunning = false;
     } else if (keystate[SDL_SCANCODE_S]) {
         saveScreenshot(fmt::format("../screenshots/screenshot_frame_{}.png", frameIndex).c_str());
+    } else if (keystate[SDL_SCANCODE_LEFT]) {
+        if(frameIndex > SWEEP_FRAMES) {
+            frameIndex -= SWEEP_FRAMES;
+        }
+    } else if (keystate[SDL_SCANCODE_RIGHT]) {
+        if(frameIndex < totalFrames - SWEEP_FRAMES) {
+            frameIndex += SWEEP_FRAMES;
+        }
     }
 }
 

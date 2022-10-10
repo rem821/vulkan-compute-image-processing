@@ -23,8 +23,9 @@
 #define VIDEO_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_1/camera_left_front/video.mp4"
 //#define VIDEO_PATH "../assets/video.mp4"
 #define SHADER_NAME "DarkChannelPrior"
-#define WORKGROUP_COUNT 512
+#define WORKGROUP_COUNT (1024 / 64)
 #define PLAY_VIDEO true
+#define SWEEP_FRAMES 20
 
 struct Vertex {
     float pos[3];
@@ -108,6 +109,7 @@ private:
     Camera camera{};
 
     cv::VideoCapture video{VIDEO_PATH };
+    double lastReadFrame = -1;
     double totalFrames = video.get(cv::CAP_PROP_FRAME_COUNT);
 
     Texture2D inputTexture;
