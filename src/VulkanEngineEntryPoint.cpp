@@ -579,11 +579,14 @@ void VulkanEngineEntryPoint::render() {
         renderer.beginSwapChainRenderPass(bufferPair.graphicsCommandBuffer, outputTexture.image);
 
         // Render first half of the screen
+        float preWidth = renderer.getEngineSwapChain()->getSwapChainExtent().width * 0.5f;
+        float preHeight = (preWidth / inputTexture.width) * inputTexture.height;
+
         VkViewport viewport = {};
         viewport.x = 0.0f;
-        viewport.y = 0.0f;
-        viewport.width = static_cast<float>(renderer.getEngineSwapChain()->getSwapChainExtent().width * 0.5f);
-        viewport.height = static_cast<float>(renderer.getEngineSwapChain()->getSwapChainExtent().height);
+        viewport.y = (renderer.getEngineSwapChain()->getSwapChainExtent().height / 2.0f) - (preHeight / 2.0f);
+        viewport.width = preWidth;
+        viewport.height = preHeight;
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
         VkRect2D scissor{{0, 0}, renderer.getEngineSwapChain()->getSwapChainExtent()};
