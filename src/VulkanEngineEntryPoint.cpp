@@ -16,7 +16,7 @@
 
 VulkanEngineEntryPoint::VulkanEngineEntryPoint() {
     camera.setViewYXZ(glm::vec3(0.0f, 0.0f, -2.0f), glm::vec3(0.0f));
-    camera.setPerspectiveProjection(glm::radians(55.f), (float) WINDOW_WIDTH * 0.27f / (float) WINDOW_HEIGHT, 1.0f,
+    camera.setPerspectiveProjection(glm::radians(60.f), (float) WINDOW_WIDTH * 0.5f / (float) WINDOW_HEIGHT, 1.0f,
                                     256.0f);
 
     prepareInputImage();
@@ -534,6 +534,7 @@ void VulkanEngineEntryPoint::render() {
 
         vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
 
+        // vkQueueWaitIdle(engineDevice.computeQueue());
         // Record graphics commandBuffer
         renderer.beginSwapChainRenderPass(bufferPair.graphicsCommandBuffer, outputTexture.image);
 
@@ -543,10 +544,9 @@ void VulkanEngineEntryPoint::render() {
 
         VkViewport viewport = {};
         viewport.x = 0.0f;
-        //viewport.y = (renderer.getEngineSwapChain()->getSwapChainExtent().height / 2.0f) - (preHeight / 2.0f);
-        viewport.y = 0.0f;
+        viewport.y = (renderer.getEngineSwapChain()->getSwapChainExtent().height / 2.0f) - (preHeight / 2.0f);
         viewport.width = preWidth;
-        viewport.height = renderer.getEngineSwapChain()->getSwapChainExtent().height;
+        viewport.height = preHeight;
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
         VkRect2D scissor{{0, 0}, renderer.getEngineSwapChain()->getSwapChainExtent()};
@@ -843,7 +843,7 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
     vkMapMemory(engineDevice.getDevice(), dstImageMemory, 0, VK_WHOLE_SIZE, 0, (void **) &dataBgr);
     dataBgr += subResourceLayout.offset;
 
-    char dataRgb[size];
+    auto *dataRgb = new uint8_t[size];
     for (size_t i = 0; i < size; i += channels) {
         dataRgb[i + 0] = dataBgr[i + 2];
         dataRgb[i + 1] = dataBgr[i + 1];
@@ -859,6 +859,7 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
     vkUnmapMemory(engineDevice.getDevice(), dstImageMemory);
     vkFreeMemory(engineDevice.getDevice(), dstImageMemory, nullptr);
     vkDestroyImage(engineDevice.getDevice(), dstImage, nullptr);
+    delete[] dataRgb;
 }
 
 void VulkanEngineEntryPoint::insertImageMemoryBarrier(
