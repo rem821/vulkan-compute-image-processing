@@ -21,6 +21,7 @@ VulkanEngineEntryPoint::VulkanEngineEntryPoint() {
 
     prepareInputImage();
     generateQuad();
+    generateQuad();
     setupVertexDescriptions();
     prepareUniformBuffers();
     outputTexture.createTextureTarget(engineDevice, inputTexture);
@@ -195,7 +196,6 @@ void VulkanEngineEntryPoint::prepareUniformBuffers() {
 void VulkanEngineEntryPoint::updateUniformBuffers() {
     uboVS.projection = camera.getProjection();
     uboVS.modelView = camera.getView();
-    uboVS.imageSize = {inputTexture.width, inputTexture.height};
     memcpy(uniformBufferVS->getMappedMemory(), &uboVS, sizeof(uboVS));
 }
 
@@ -375,7 +375,7 @@ VkShaderModule VulkanEngineEntryPoint::loadShaderModule(const char *fileName, Vk
 void VulkanEngineEntryPoint::setupDescriptorPool() {
     VkDescriptorPoolSize uniformBuffers{};
     uniformBuffers.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uniformBuffers.descriptorCount = 3;
+    uniformBuffers.descriptorCount = 2;
 
     VkDescriptorPoolSize imageSamplers{};
     imageSamplers.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -449,32 +449,24 @@ void VulkanEngineEntryPoint::setupDescriptorSet() {
 }
 
 void VulkanEngineEntryPoint::prepareCompute() {
-    VkDescriptorSetLayoutBinding imageUniformBufferLayoutBinding{};
-    imageUniformBufferLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    imageUniformBufferLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    imageUniformBufferLayoutBinding.binding = 0;
-    imageUniformBufferLayoutBinding.descriptorCount = 1;
-
     VkDescriptorSetLayoutBinding inputImageLayoutBinding{};
     inputImageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     inputImageLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    inputImageLayoutBinding.binding = 1;
+    inputImageLayoutBinding.binding = 0;
     inputImageLayoutBinding.descriptorCount = 1;
 
     VkDescriptorSetLayoutBinding outputImageLayoutBinding{};
     outputImageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     outputImageLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    outputImageLayoutBinding.binding = 2;
+    outputImageLayoutBinding.binding = 1;
     outputImageLayoutBinding.descriptorCount = 1;
 
     // Create compute pipeline
     // Compute pipelines are created separate from graphics pipelines even if they use the same queue
     std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
-            // Binding 0: Uniform buffer
-            imageUniformBufferLayoutBinding,
-            // Binding 1: Input image (read-only)
+            // Binding 0: Input image (read-only)
             inputImageLayoutBinding,
-            // Binding 2: Output image (write)
+            // Binding 1: Output image (write)
             outputImageLayoutBinding,
     };
 
@@ -541,7 +533,6 @@ void VulkanEngineEntryPoint::render() {
                                 nullptr);
 
         vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
-        //vkCmdDispatch(bufferPair.computeCommandBuffer, 1, 1, 1);
 
         // Record graphics commandBuffer
         renderer.beginSwapChainRenderPass(bufferPair.graphicsCommandBuffer, outputTexture.image);
@@ -552,9 +543,10 @@ void VulkanEngineEntryPoint::render() {
 
         VkViewport viewport = {};
         viewport.x = 0.0f;
-        viewport.y = (renderer.getEngineSwapChain()->getSwapChainExtent().height / 2.0f) - (preHeight / 2.0f);
+        //viewport.y = (renderer.getEngineSwapChain()->getSwapChainExtent().height / 2.0f) - (preHeight / 2.0f);
+        viewport.y = 0.0f;
         viewport.width = preWidth;
-        viewport.height = preHeight;
+        viewport.height = renderer.getEngineSwapChain()->getSwapChainExtent().height;
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
         VkRect2D scissor{{0, 0}, renderer.getEngineSwapChain()->getSwapChainExtent()};
@@ -587,15 +579,16 @@ void VulkanEngineEntryPoint::render() {
         renderer.endSwapChainRenderPass(bufferPair.graphicsCommandBuffer);
         renderer.endFrame();
 
+
+        vkQueueWaitIdle(engineDevice.graphicsQueue());
         if (PLAY_VIDEO) {
-            vkQueueWaitIdle(engineDevice.graphicsQueue());
             // Prepare next frame
             frameIndex += 1;
             fmt::print("Preparing frame {}\n", frameIndex);
             prepareInputImage();
-            updateComputeDescriptorSets();
-            updateGraphicsDescriptorSets();
         }
+        updateComputeDescriptorSets();
+        updateGraphicsDescriptorSets();
     }
 }
 
@@ -629,19 +622,11 @@ void VulkanEngineEntryPoint::handleEvents() {
 }
 
 void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
-    VkWriteDescriptorSet uniformDescriptorSet{};
-    uniformDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    uniformDescriptorSet.dstSet = graphics.descriptorSetPreCompute;
-    uniformDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uniformDescriptorSet.dstBinding = 0;
-    uniformDescriptorSet.pBufferInfo = &uniformBufferVS->getBufferInfo();
-    uniformDescriptorSet.descriptorCount = 1;
-
     VkWriteDescriptorSet inputImageDescriptorSet{};
     inputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     inputImageDescriptorSet.dstSet = compute.descriptorSet;
     inputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    inputImageDescriptorSet.dstBinding = 1;
+    inputImageDescriptorSet.dstBinding = 0;
     inputImageDescriptorSet.pImageInfo = &inputTexture.descriptor;
     inputImageDescriptorSet.descriptorCount = 1;
 
@@ -649,15 +634,13 @@ void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
     outputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     outputImageDescriptorSet.dstSet = compute.descriptorSet;
     outputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    outputImageDescriptorSet.dstBinding = 2;
+    outputImageDescriptorSet.dstBinding = 1;
     outputImageDescriptorSet.pImageInfo = &outputTexture.descriptor;
     outputImageDescriptorSet.descriptorCount = 1;
 
-
     std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets = {
-            uniformDescriptorSet,
             inputImageDescriptorSet,
-            outputImageDescriptorSet
+            outputImageDescriptorSet,
     };
     vkUpdateDescriptorSets(engineDevice.getDevice(), computeWriteDescriptorSets.size(),
                            computeWriteDescriptorSets.data(), 0, nullptr);

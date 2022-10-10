@@ -15,16 +15,16 @@
 
 #include "glm/glm.hpp"
 
-#define VIDEO_DOWNSCALE_FACTOR 2
-#define WINDOW_WIDTH int(960)
-#define WINDOW_HEIGHT int(540)
+#define VIDEO_DOWNSCALE_FACTOR 1
+#define WINDOW_WIDTH 1920
+#define WINDOW_HEIGHT 1080
 #define WINDOW_TITLE "Vulkan Compute Render Window"
-#define IMAGE_PATH "../assets/image.jpg"
-#define VIDEO_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_1/camera_left_front/video.mp4"
-//#define VIDEO_PATH "../assets/video.mp4"
+#define IMAGE_PATH "../assets/haze.jpg"
+//#define VIDEO_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_1/camera_left_front/video.mp4"
+#define VIDEO_PATH "../assets/video.mp4"
 #define SHADER_NAME "DarkChannelPrior"
-#define WORKGROUP_COUNT 16
-#define PLAY_VIDEO true
+#define WORKGROUP_COUNT 8
+#define PLAY_VIDEO false
 
 struct Vertex {
     float pos[3];
@@ -42,7 +42,6 @@ public:
     struct {
         glm::mat4 projection;
         glm::mat4 modelView;
-        glm::vec2 imageSize;
     } uboVS;
 
     struct {

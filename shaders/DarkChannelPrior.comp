@@ -1,23 +1,15 @@
 #version 450
 
-layout (local_size_x = 8, local_size_y = 8) in;
-layout (binding = 0) uniform UBO
-{
-    mat4 projection;
-    mat4 model;
-    vec2 imageSize;
-} ubo;
-layout (binding = 1, rgba8) uniform readonly image2D inputImage;
-layout (binding = 2, rgba8) uniform image2D resultImage;
+layout (local_size_x = 1, local_size_y = 1) in;
+layout (binding = 0, rgba8) uniform readonly image2D inputImage;
+layout (binding = 1, rgba8) uniform image2D resultImage;
 
-const int kernelSize = 8;
+const int kernelSize = 2;
 
 struct ImageData
 {
-    float pixels[kernelSize * kernelSize / 4];
+    float pixels[kernelSize * kernelSize];
 } kernelMinChannels;
-
-shared int maxGroupBrightness;
 
 void main()
 {
@@ -28,10 +20,8 @@ void main()
         for (int j = -kernelSize / 2; j <= kernelSize / 2; ++j)
         {
             vec3 rgb = imageLoad(inputImage, ivec2(gl_GlobalInvocationID.x + i, gl_GlobalInvocationID.y + j)).rgb;
-            int lum = int(floor(255 * ((rgb.r + rgb.g + rgb.b) / 3.0)));
 
             kernelMinChannels.pixels[n] = min(min(rgb.r, rgb.g), rgb.b);
-            atomicMax(maxGroupBrightness, lum);
             n++;
         }
     }
@@ -43,9 +33,7 @@ void main()
         }
     }
 
-    barrier();
-
-    //vec4 res = vec4(maxGroupBrightness / 255, maxGroupBrightness / 255, maxGroupBrightness / 255, 1.0);
     vec4 res = vec4(kernelMin, kernelMin, kernelMin, 1.0);
+    //vec4 res = vec4(1.0, 0.0, 0.0, 1.0);
     imageStore(resultImage, ivec2(gl_GlobalInvocationID.xy), res);
 }
