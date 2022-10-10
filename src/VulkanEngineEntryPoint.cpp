@@ -13,8 +13,23 @@
 #include <vulkan/vulkan.hpp>
 #include <fmt/core.h>
 #include <vector>
+#include "../external/renderdoc/renderdoc_app.h"
+
+RENDERDOC_API_1_1_2 *rdoc_api = nullptr;
 
 VulkanEngineEntryPoint::VulkanEngineEntryPoint() {
+
+    if(void *mod = dlopen("../external/renderdoc/librenderdoc.so", RTLD_NOW))
+    {
+        pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)dlsym(mod, "RENDERDOC_GetAPI");
+        int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void **)&rdoc_api);
+        assert(ret == 1);
+    }
+    if(rdoc_api)  {
+        rdoc_api->TriggerCapture();
+        rdoc_api->StartFrameCapture(engineDevice.getDevice(), window.sdlWindow());
+    }
+
     camera.setViewYXZ(glm::vec3(0.0f, 0.0f, -2.0f), glm::vec3(0.0f));
     camera.setPerspectiveProjection(glm::radians(60.f), (float) WINDOW_WIDTH * 0.5f / (float) WINDOW_HEIGHT, 1.0f,
                                     256.0f);
@@ -593,6 +608,7 @@ void VulkanEngineEntryPoint::render() {
         updateComputeDescriptorSets();
         updateGraphicsDescriptorSets();
     }
+    if(rdoc_api) rdoc_api->EndFrameCapture(engineDevice.getDevice(), window.sdlWindow());
 }
 
 void VulkanEngineEntryPoint::handleEvents() {

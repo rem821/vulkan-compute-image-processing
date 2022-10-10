@@ -15,15 +15,16 @@
 
 #include "glm/glm.hpp"
 
-#define VIDEO_DOWNSCALE_FACTOR 4
+#define VIDEO_DOWNSCALE_FACTOR 2
 #define WINDOW_WIDTH 1920
 #define WINDOW_HEIGHT 1080
 #define WINDOW_TITLE "Vulkan Compute Render Window"
-#define IMAGE_PATH "../assets/image.jpg"
-#define VIDEO_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_1/camera_left_front/video.mp4"
+#define IMAGE_PATH "../assets/image.png"
+#define VIDEO_PATH "/home/standa/3_1_1_1/camera_left_front/video.mp4"
+//#define VIDEO_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_1/camera_left_front/video.mp4"
 //#define VIDEO_PATH "../assets/video.mp4"
 #define SHADER_NAME "DarkChannelPrior"
-#define WORKGROUP_COUNT (1024 / 64)
+#define WORKGROUP_COUNT (1024 / 32)
 #define PLAY_VIDEO true
 #define SWEEP_FRAMES 20
 
