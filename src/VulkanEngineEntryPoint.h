@@ -15,18 +15,19 @@
 
 #include "glm/glm.hpp"
 
-#define VIDEO_DOWNSCALE_FACTOR 2
+#define VIDEO_DOWNSCALE_FACTOR 4
 #define WINDOW_WIDTH 1920
 #define WINDOW_HEIGHT 1080
 #define WINDOW_TITLE "Vulkan Compute Render Window"
-#define IMAGE_PATH "../assets/image.png"
-#define VIDEO_PATH "/home/standa/3_1_1_1/camera_left_front/video.mp4"
-//#define VIDEO_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_1/camera_left_front/video.mp4"
+#define IMAGE_PATH "../assets/image.jpg"
+//#define VIDEO_PATH "/home/standa/3_1_1_1/camera_left_front/video.mp4"
+#define VIDEO_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_2/camera_left_front/video.mp4"
 //#define VIDEO_PATH "../assets/video.mp4"
-#define SHADER_NAME "DarkChannelPrior"
 #define WORKGROUP_COUNT (1024 / 32)
 #define PLAY_VIDEO true
 #define SWEEP_FRAMES 20
+
+#define DARK_CHANNEL_PRIOR "DarkChannelPrior"
 
 struct Vertex {
     float pos[3];
@@ -58,9 +59,8 @@ public:
         VkDescriptorSetLayout descriptorSetLayout;
         VkDescriptorSet descriptorSet;
         VkPipelineLayout pipelineLayout;
-        std::vector<VkPipeline> pipelines;
-        int32_t pipelineIndex = 0;
-    } compute;
+        VkPipeline pipeline;
+    };
 
     VulkanEngineEntryPoint();
     ~VulkanEngineEntryPoint();
@@ -92,6 +92,10 @@ private:
     VkPipelineShaderStageCreateInfo loadShader(std::string fileName, VkShaderStageFlagBits stage);
     VkShaderModule loadShaderModule(const char *fileName, VkDevice device);
 
+    void prepareComputePipeline(std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings);
+
+    void getMaxAirlight();
+
     void insertImageMemoryBarrier(
             VkCommandBuffer cmdbuffer,
             VkImage image,
@@ -114,14 +118,17 @@ private:
     double totalFrames = video.get(cv::CAP_PROP_FRAME_COUNT);
 
     Texture2D inputTexture;
-    Texture2D outputTexture;
+    Texture2D darkChannelTexture;
 
     std::unique_ptr<VulkanEngineBuffer> vertexBuffer;
     std::unique_ptr<VulkanEngineBuffer> indexBuffer;
 
     std::unique_ptr<VulkanEngineBuffer> uniformBufferVS;
+    std::unique_ptr<VulkanEngineBuffer> airLightBuffer;
 
     std::vector<VkShaderModule> shaderModules;
+
+    std::vector<Compute> compute;
 
     VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
 

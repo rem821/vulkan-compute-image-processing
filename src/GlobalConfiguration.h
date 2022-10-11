@@ -4,4 +4,4 @@
 #pragma once
 
 #define TIMER_ON false
-#define INTEGRATED_GRAPHICS false
+#define INTEGRATED_GRAPHICS true

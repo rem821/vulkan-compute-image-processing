@@ -19,13 +19,12 @@ RENDERDOC_API_1_1_2 *rdoc_api = nullptr;
 
 VulkanEngineEntryPoint::VulkanEngineEntryPoint() {
 
-    if(void *mod = dlopen("../external/renderdoc/librenderdoc.so", RTLD_NOW))
-    {
-        pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)dlsym(mod, "RENDERDOC_GetAPI");
-        int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void **)&rdoc_api);
+    if (void *mod = dlopen("../external/renderdoc/librenderdoc.so", RTLD_NOW)) {
+        pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI) dlsym(mod, "RENDERDOC_GetAPI");
+        int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void **) &rdoc_api);
         assert(ret == 1);
     }
-    if(rdoc_api)  {
+    if (rdoc_api) {
         rdoc_api->TriggerCapture();
         rdoc_api->StartFrameCapture(engineDevice.getDevice(), window.sdlWindow());
     }
@@ -39,7 +38,11 @@ VulkanEngineEntryPoint::VulkanEngineEntryPoint() {
     generateQuad();
     setupVertexDescriptions();
     prepareUniformBuffers();
-    outputTexture.createTextureTarget(engineDevice, inputTexture);
+    darkChannelTexture.createTextureTarget(engineDevice, inputTexture);
+    airLightBuffer = std::make_unique<VulkanEngineBuffer>(engineDevice, sizeof(int32_t), 1000,
+                                                          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                                                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     setupDescriptorSetLayout();
     preparePipelines();
     setupDescriptorPool();
@@ -58,7 +61,7 @@ void VulkanEngineEntryPoint::prepareInputImage() {
         }
 
         cv::Mat frame;
-        while(lastReadFrame < frameIndex) {
+        while (lastReadFrame < frameIndex) {
             video.read(frame);
             lastReadFrame += 1;
         }
@@ -206,7 +209,7 @@ void VulkanEngineEntryPoint::prepareUniformBuffers() {
                                                            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                                            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    uniformBufferVS->map();
+    uniformBufferVS->map();;
 
     updateUniformBuffers();
 }
@@ -393,20 +396,25 @@ VkShaderModule VulkanEngineEntryPoint::loadShaderModule(const char *fileName, Vk
 void VulkanEngineEntryPoint::setupDescriptorPool() {
     VkDescriptorPoolSize uniformBuffers{};
     uniformBuffers.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uniformBuffers.descriptorCount = 2;
+    uniformBuffers.descriptorCount = 10;
 
     VkDescriptorPoolSize imageSamplers{};
     imageSamplers.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    imageSamplers.descriptorCount = 2;
+    imageSamplers.descriptorCount = 10;
 
     VkDescriptorPoolSize storageImage{};
     storageImage.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    storageImage.descriptorCount = 2;
+    storageImage.descriptorCount = 10;
+
+    VkDescriptorPoolSize storageBuffer{};
+    storageImage.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    storageImage.descriptorCount = 10;
 
     std::vector<VkDescriptorPoolSize> poolSizes = {
-            uniformBuffers, // Graphics pipelines uniform buffers
-            imageSamplers, // Graphics pipelines image samplers for displaying compute output image
-            storageImage, // Compute pipelines uses a storage image for image reads and writes
+            uniformBuffers,
+            imageSamplers,
+            storageImage,
+            storageBuffer,
     };
 
     VkDescriptorPoolCreateInfo descriptorPoolInfo{};
@@ -454,7 +462,7 @@ void VulkanEngineEntryPoint::setupDescriptorSet() {
     postImageDescriptorSet.dstSet = graphics.descriptorSetPostCompute;
     postImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     postImageDescriptorSet.dstBinding = 1;
-    postImageDescriptorSet.pImageInfo = &outputTexture.descriptor;
+    postImageDescriptorSet.pImageInfo = &darkChannelTexture.descriptor;
     postImageDescriptorSet.descriptorCount = 1;
 
 
@@ -479,14 +487,27 @@ void VulkanEngineEntryPoint::prepareCompute() {
     outputImageLayoutBinding.binding = 1;
     outputImageLayoutBinding.descriptorCount = 1;
 
-    // Create compute pipeline
-    // Compute pipelines are created separate from graphics pipelines even if they use the same queue
+    VkDescriptorSetLayoutBinding outputAtmosphericLightLayoutBinding{};
+    outputAtmosphericLightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    outputAtmosphericLightLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    outputAtmosphericLightLayoutBinding.binding = 2;
+    outputAtmosphericLightLayoutBinding.descriptorCount = 1;
+
     std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
             // Binding 0: Input image (read-only)
             inputImageLayoutBinding,
             // Binding 1: Output image (write)
             outputImageLayoutBinding,
+            // Binding 2: Output atmospheric light buffer (write)
+            outputAtmosphericLightLayoutBinding,
     };
+
+    prepareComputePipeline(setLayoutBindings);
+}
+
+void VulkanEngineEntryPoint::prepareComputePipeline(std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings) {
+    compute.emplace_back();
+    uint32_t pipelineIndex = compute.size() - 1;
 
     VkDescriptorSetLayoutCreateInfo descriptorLayout{};
     descriptorLayout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -494,27 +515,28 @@ void VulkanEngineEntryPoint::prepareCompute() {
     descriptorLayout.bindingCount = static_cast<uint32_t>(setLayoutBindings.size());
 
     if (vkCreateDescriptorSetLayout(engineDevice.getDevice(), &descriptorLayout, nullptr,
-                                    &compute.descriptorSetLayout) != VK_SUCCESS) {
+                                    &compute.at(pipelineIndex).descriptorSetLayout) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create descriptor set layout for compute pipeline!");
     }
 
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
     pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutCreateInfo.setLayoutCount = 1;
-    pipelineLayoutCreateInfo.pSetLayouts = &compute.descriptorSetLayout;
+    pipelineLayoutCreateInfo.pSetLayouts = &compute.at(pipelineIndex).descriptorSetLayout;
 
-    if (vkCreatePipelineLayout(engineDevice.getDevice(), &pipelineLayoutCreateInfo, nullptr, &compute.pipelineLayout) !=
-        VK_SUCCESS) {
+    if (vkCreatePipelineLayout(engineDevice.getDevice(), &pipelineLayoutCreateInfo, nullptr,
+                               &compute.at(pipelineIndex).pipelineLayout) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create pipeline layout for compute!");
     }
 
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocInfo.descriptorPool = descriptorPool;
-    allocInfo.pSetLayouts = &compute.descriptorSetLayout;
+    allocInfo.pSetLayouts = &compute.at(pipelineIndex).descriptorSetLayout;
     allocInfo.descriptorSetCount = 1;
 
-    if (vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &compute.descriptorSet) != VK_SUCCESS) {
+    if (vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo,
+                                 &compute.at(pipelineIndex).descriptorSet) != VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate descriptor sets for compute!");
     }
 
@@ -523,21 +545,17 @@ void VulkanEngineEntryPoint::prepareCompute() {
     // Create compute shader pipelines
     VkComputePipelineCreateInfo computePipelineCreateInfo{};
     computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-    computePipelineCreateInfo.layout = compute.pipelineLayout;
+    computePipelineCreateInfo.layout = compute.at(pipelineIndex).pipelineLayout;
     computePipelineCreateInfo.flags = 0;
 
-    // One pipeline for each effect
-    shaderNames = {SHADER_NAME};
-    for (auto &shaderName: shaderNames) {
-        std::string fileName = "../shaders/" + shaderName + ".comp.spv";
-        computePipelineCreateInfo.stage = loadShader(fileName, VK_SHADER_STAGE_COMPUTE_BIT);
-        VkPipeline pipeline;
-        if (vkCreateComputePipelines(engineDevice.getDevice(), VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr,
-                                     &pipeline) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create compute pipelines!");
-        }
-        compute.pipelines.push_back(pipeline);
+    std::string fileName = "../shaders/" + (std::string) DARK_CHANNEL_PRIOR + ".comp.spv";
+    computePipelineCreateInfo.stage = loadShader(fileName, VK_SHADER_STAGE_COMPUTE_BIT);
+    VkPipeline pipeline;
+    if (vkCreateComputePipelines(engineDevice.getDevice(), VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr,
+                                 &pipeline) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create compute pipelines!");
     }
+    compute.at(pipelineIndex).pipeline = pipeline;
 }
 
 void VulkanEngineEntryPoint::render() {
@@ -545,16 +563,17 @@ void VulkanEngineEntryPoint::render() {
     if (bufferPair.computeCommandBuffer != nullptr && bufferPair.graphicsCommandBuffer != nullptr) {
         // Record compute command buffer
         vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                          compute.pipelines[compute.pipelineIndex]);
-        vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipelineLayout,
-                                0, 1, &compute.descriptorSet, 0,
+                          compute.at(0).pipeline);
+        vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                compute.at(0).pipelineLayout,
+                                0, 1, &compute.at(0).descriptorSet, 0,
                                 nullptr);
 
         vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
 
         // vkQueueWaitIdle(engineDevice.computeQueue());
         // Record graphics commandBuffer
-        renderer.beginSwapChainRenderPass(bufferPair.graphicsCommandBuffer, outputTexture.image);
+        renderer.beginSwapChainRenderPass(bufferPair.graphicsCommandBuffer, darkChannelTexture.image);
 
         // Render first half of the screen
         float preWidth = renderer.getEngineSwapChain()->getSwapChainExtent().width * 0.5f;
@@ -599,6 +618,9 @@ void VulkanEngineEntryPoint::render() {
 
 
         vkQueueWaitIdle(engineDevice.graphicsQueue());
+
+        getMaxAirlight();
+
         if (PLAY_VIDEO) {
             // Prepare next frame
             frameIndex += 1;
@@ -608,7 +630,20 @@ void VulkanEngineEntryPoint::render() {
         updateComputeDescriptorSets();
         updateGraphicsDescriptorSets();
     }
-    if(rdoc_api) rdoc_api->EndFrameCapture(engineDevice.getDevice(), window.sdlWindow());
+    if (rdoc_api) rdoc_api->EndFrameCapture(engineDevice.getDevice(), window.sdlWindow());
+}
+
+void VulkanEngineEntryPoint::getMaxAirlight() {
+    airLightBuffer->map();
+    int32_t *airlightGroups = static_cast<int32_t *>(airLightBuffer->getMappedMemory());
+    int32_t airlightGroupsSize = airLightBuffer->getBufferSize() / sizeof(int32_t);
+    int32_t maxAirlight = 0;
+    for (int i = 0; i < airlightGroupsSize; i++) {
+        if (airlightGroups[i] > maxAirlight) {
+            maxAirlight = airlightGroups[i];
+        }
+    }
+    fmt::print("Max airlight for frame {} is: {}\n", frameIndex, maxAirlight);
 }
 
 void VulkanEngineEntryPoint::handleEvents() {
@@ -638,11 +673,11 @@ void VulkanEngineEntryPoint::handleEvents() {
     } else if (keystate[SDL_SCANCODE_S]) {
         saveScreenshot(fmt::format("../screenshots/screenshot_frame_{}.png", frameIndex).c_str());
     } else if (keystate[SDL_SCANCODE_LEFT]) {
-        if(frameIndex > SWEEP_FRAMES) {
+        if (frameIndex > SWEEP_FRAMES) {
             frameIndex -= SWEEP_FRAMES;
         }
     } else if (keystate[SDL_SCANCODE_RIGHT]) {
-        if(frameIndex < totalFrames - SWEEP_FRAMES) {
+        if (frameIndex < totalFrames - SWEEP_FRAMES) {
             frameIndex += SWEEP_FRAMES;
         }
     }
@@ -651,7 +686,7 @@ void VulkanEngineEntryPoint::handleEvents() {
 void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
     VkWriteDescriptorSet inputImageDescriptorSet{};
     inputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    inputImageDescriptorSet.dstSet = compute.descriptorSet;
+    inputImageDescriptorSet.dstSet = compute.at(0).descriptorSet;
     inputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     inputImageDescriptorSet.dstBinding = 0;
     inputImageDescriptorSet.pImageInfo = &inputTexture.descriptor;
@@ -659,15 +694,25 @@ void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
 
     VkWriteDescriptorSet outputImageDescriptorSet{};
     outputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    outputImageDescriptorSet.dstSet = compute.descriptorSet;
+    outputImageDescriptorSet.dstSet = compute.at(0).descriptorSet;
     outputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     outputImageDescriptorSet.dstBinding = 1;
-    outputImageDescriptorSet.pImageInfo = &outputTexture.descriptor;
+    outputImageDescriptorSet.pImageInfo = &darkChannelTexture.descriptor;
     outputImageDescriptorSet.descriptorCount = 1;
+
+    VkWriteDescriptorSet outputAirLightBufferDescriptorSet{};
+    outputAirLightBufferDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    outputAirLightBufferDescriptorSet.dstSet = compute.at(0).descriptorSet;
+    outputAirLightBufferDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    outputAirLightBufferDescriptorSet.dstBinding = 2;
+    outputAirLightBufferDescriptorSet.pBufferInfo = &airLightBuffer->getBufferInfo();
+    outputAirLightBufferDescriptorSet.descriptorCount = 1;
+
 
     std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets = {
             inputImageDescriptorSet,
             outputImageDescriptorSet,
+            outputAirLightBufferDescriptorSet,
     };
     vkUpdateDescriptorSets(engineDevice.getDevice(), computeWriteDescriptorSets.size(),
                            computeWriteDescriptorSets.data(), 0, nullptr);
