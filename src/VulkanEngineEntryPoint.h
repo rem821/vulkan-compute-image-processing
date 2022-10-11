@@ -45,7 +45,12 @@ public:
     struct {
         glm::mat4 projection;
         glm::mat4 modelView;
-    } uboVS;
+    } uboVertexShader;
+
+    struct {
+        glm::vec3 airLight;
+        glm::float32_t omega;
+    } uboComputeShader;
 
     struct {
         VkDescriptorSetLayout descriptorSetLayout;
@@ -63,22 +68,24 @@ public:
     };
 
     VulkanEngineEntryPoint();
-    ~VulkanEngineEntryPoint();
+    ~VulkanEngineEntryPoint() = default;
 
     void prepareInputImage();
     static bool loadImageFromFile(const std::string& file, void *pixels, size_t &size, int &width, int &height, int &channels);
     void generateQuad();
     void setupVertexDescriptions();
-    void prepareUniformBuffers();
-    void updateUniformBuffers();
+    void prepareVertexUniformBuffer();
+    void updateVertexUniformBuffer();
     void setupDescriptorSetLayout();
-    void preparePipelines();
+    void prepareGraphicsPipeline();
     void setupDescriptorPool();
     void setupDescriptorSet();
+    void prepareComputeUniformBuffer();
     void prepareCompute();
 
     void updateComputeDescriptorSets();
     void updateGraphicsDescriptorSets();
+    void updateComputeUniformBuffer(glm::vec3 airLight);
 
     void render();
     void handleEvents();
@@ -123,7 +130,8 @@ private:
     std::unique_ptr<VulkanEngineBuffer> vertexBuffer;
     std::unique_ptr<VulkanEngineBuffer> indexBuffer;
 
-    std::unique_ptr<VulkanEngineBuffer> uniformBufferVS;
+    std::unique_ptr<VulkanEngineBuffer> uniformBufferVertexShader;
+    std::unique_ptr<VulkanEngineBuffer> uniformBufferComputeShader;
     std::unique_ptr<VulkanEngineBuffer> airLightBuffer;
 
     std::vector<VkShaderModule> shaderModules;

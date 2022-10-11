@@ -19,40 +19,46 @@ RENDERDOC_API_1_1_2 *rdoc_api = nullptr;
 
 VulkanEngineEntryPoint::VulkanEngineEntryPoint() {
 
-    if (void *mod = dlopen("../external/renderdoc/librenderdoc.so", RTLD_NOW)) {
-        pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI) dlsym(mod, "RENDERDOC_GetAPI");
-        int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void **) &rdoc_api);
-        assert(ret == 1);
-    }
-    if (rdoc_api) {
-        rdoc_api->TriggerCapture();
-        rdoc_api->StartFrameCapture(engineDevice.getDevice(), window.sdlWindow());
+    // Initialize RenderDoc API
+    {
+        if (void *mod = dlopen("../external/renderdoc/librenderdoc.so", RTLD_NOW)) {
+            auto RENDERDOC_GetAPI = (pRENDERDOC_GetAPI) dlsym(mod, "RENDERDOC_GetAPI");
+            int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void **) &rdoc_api);
+            assert(ret == 1);
+        }
+        if (rdoc_api) {
+            rdoc_api->TriggerCapture();
+            rdoc_api->StartFrameCapture(engineDevice.getDevice(), window.sdlWindow());
+        }
     }
 
-    camera.setViewYXZ(glm::vec3(0.0f, 0.0f, -2.0f), glm::vec3(0.0f));
-    camera.setPerspectiveProjection(glm::radians(60.f), (float) WINDOW_WIDTH * 0.5f / (float) WINDOW_HEIGHT, 1.0f,
-                                    256.0f);
-
+    // Init resources
     prepareInputImage();
-    generateQuad();
-    generateQuad();
-    setupVertexDescriptions();
-    prepareUniformBuffers();
     darkChannelTexture.createTextureTarget(engineDevice, inputTexture);
     airLightBuffer = std::make_unique<VulkanEngineBuffer>(engineDevice, sizeof(int32_t), 3000,
                                                           VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    // Graphics
+    generateQuad();
+    setupVertexDescriptions();
+    prepareVertexUniformBuffer();
     setupDescriptorSetLayout();
-    preparePipelines();
+    prepareGraphicsPipeline();
     setupDescriptorPool();
     setupDescriptorSet();
+
+    camera.setViewYXZ(glm::vec3(0.0f, 0.0f, -2.0f), glm::vec3(0.0f));
+    camera.setPerspectiveProjection(glm::radians(60.f), (float) WINDOW_WIDTH * 0.5f / (float) WINDOW_HEIGHT, 1.0f,
+                                    256.0f);
+
+    // Compute
+    prepareComputeUniformBuffer();
     prepareCompute();
 
     isRunning = true;
 }
-
-VulkanEngineEntryPoint::~VulkanEngineEntryPoint() = default;
 
 void VulkanEngineEntryPoint::prepareInputImage() {
     if (PLAY_VIDEO && frameIndex < totalFrames) {
@@ -112,9 +118,8 @@ void VulkanEngineEntryPoint::prepareInputImage() {
     }
 }
 
-bool
-VulkanEngineEntryPoint::loadImageFromFile(const std::string &file, void *pixels, size_t &size, int &width, int &height,
-                                          int &channels) {
+bool VulkanEngineEntryPoint::loadImageFromFile(const std::string &file, void *pixels, size_t &size, int &width,
+                                               int &height, int &channels) {
     stbi_uc *px = stbi_load(file.c_str(), &width, &height, nullptr, STBI_rgb_alpha);
 
     channels = 4;
@@ -129,7 +134,6 @@ VulkanEngineEntryPoint::loadImageFromFile(const std::string &file, void *pixels,
     return true;
 }
 
-// Setup vertices for a single uv-mapped quad
 void VulkanEngineEntryPoint::generateQuad() {
     // Setup vertices for a single uv-mapped quad made from two triangles
     std::vector<Vertex> _vertices =
@@ -202,22 +206,26 @@ void VulkanEngineEntryPoint::setupVertexDescriptions() {
     vertices.inputState.pVertexAttributeDescriptions = vertices.attributeDescriptions.data();
 }
 
-// Prepare and initialize uniform buffer containing shader uniforms
-void VulkanEngineEntryPoint::prepareUniformBuffers() {
-    // Vertex shader uniform buffer block
-    uniformBufferVS = std::make_unique<VulkanEngineBuffer>(engineDevice, sizeof(uboVS), 1,
-                                                           VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    uniformBufferVS->map();;
+void VulkanEngineEntryPoint::prepareVertexUniformBuffer() {
+    uniformBufferVertexShader = std::make_unique<VulkanEngineBuffer>(engineDevice, sizeof(uboVertexShader), 1,
+                                                                     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    uniformBufferVertexShader->map();
 
-    updateUniformBuffers();
+    updateVertexUniformBuffer();
 }
 
-void VulkanEngineEntryPoint::updateUniformBuffers() {
-    uboVS.projection = camera.getProjection();
-    uboVS.modelView = camera.getView();
-    memcpy(uniformBufferVS->getMappedMemory(), &uboVS, sizeof(uboVS));
+void VulkanEngineEntryPoint::updateVertexUniformBuffer() {
+    uboVertexShader.projection = camera.getProjection();
+    uboVertexShader.modelView = camera.getView();
+    memcpy(uniformBufferVertexShader->getMappedMemory(), &uboVertexShader, sizeof(uboVertexShader));
+}
+
+void VulkanEngineEntryPoint::updateComputeUniformBuffer(glm::vec3 airLight) {
+    uboComputeShader.airLight = airLight;
+    uboComputeShader.omega = 0.98f;
+    memcpy(uniformBufferComputeShader->getMappedMemory(), &uboComputeShader, sizeof(uboComputeShader));
 }
 
 void VulkanEngineEntryPoint::setupDescriptorSetLayout() {
@@ -262,7 +270,7 @@ void VulkanEngineEntryPoint::setupDescriptorSetLayout() {
     }
 }
 
-void VulkanEngineEntryPoint::preparePipelines() {
+void VulkanEngineEntryPoint::prepareGraphicsPipeline() {
     VkPipelineInputAssemblyStateCreateInfo inputAssemblyState{};
     inputAssemblyState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -349,50 +357,6 @@ void VulkanEngineEntryPoint::preparePipelines() {
     }
 }
 
-VkPipelineShaderStageCreateInfo VulkanEngineEntryPoint::loadShader(std::string fileName, VkShaderStageFlagBits stage) {
-    VkPipelineShaderStageCreateInfo shaderStage = {};
-    shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    shaderStage.stage = stage;
-
-    shaderStage.module = loadShaderModule(fileName.c_str(), engineDevice.getDevice());
-
-    shaderStage.pName = "main";
-    assert(shaderStage.module != VK_NULL_HANDLE);
-    shaderModules.push_back(shaderStage.module);
-    return shaderStage;
-}
-
-VkShaderModule VulkanEngineEntryPoint::loadShaderModule(const char *fileName, VkDevice device) {
-    std::ifstream is(fileName, std::ios::binary | std::ios::in | std::ios::ate);
-
-    if (is.is_open()) {
-        size_t size = is.tellg();
-        is.seekg(0, std::ios::beg);
-        char *shaderCode = new char[size];
-        is.read(shaderCode, size);
-        is.close();
-
-        assert(size > 0);
-
-        VkShaderModule shaderModule;
-        VkShaderModuleCreateInfo moduleCreateInfo{};
-        moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        moduleCreateInfo.codeSize = size;
-        moduleCreateInfo.pCode = (uint32_t *) shaderCode;
-
-        if (vkCreateShaderModule(device, &moduleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create shader module!");
-        }
-
-        delete[] shaderCode;
-
-        return shaderModule;
-    } else {
-        std::cerr << "Error: Could not open shader file \"" << fileName << "\"" << "\n";
-        return VK_NULL_HANDLE;
-    }
-}
-
 void VulkanEngineEntryPoint::setupDescriptorPool() {
     VkDescriptorPoolSize uniformBuffers{};
     uniformBuffers.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -454,7 +418,7 @@ void VulkanEngineEntryPoint::setupDescriptorSet() {
     postUniformDescriptorSet.dstSet = graphics.descriptorSetPostCompute;
     postUniformDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     postUniformDescriptorSet.dstBinding = 0;
-    postUniformDescriptorSet.pBufferInfo = &uniformBufferVS->getBufferInfo();
+    postUniformDescriptorSet.pBufferInfo = &uniformBufferVertexShader->getBufferInfo();
     postUniformDescriptorSet.descriptorCount = 1;
 
     VkWriteDescriptorSet postImageDescriptorSet{};
@@ -465,13 +429,20 @@ void VulkanEngineEntryPoint::setupDescriptorSet() {
     postImageDescriptorSet.pImageInfo = &darkChannelTexture.descriptor;
     postImageDescriptorSet.descriptorCount = 1;
 
-
     std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
             postUniformDescriptorSet,
             postImageDescriptorSet,
     };
     vkUpdateDescriptorSets(engineDevice.getDevice(), writeDescriptorSets.size(), writeDescriptorSets.data(), 0,
                            nullptr);
+}
+
+void VulkanEngineEntryPoint::prepareComputeUniformBuffer() {
+    uniformBufferComputeShader = std::make_unique<VulkanEngineBuffer>(engineDevice, sizeof(uboComputeShader), 1,
+                                                                      VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                                      VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    uniformBufferComputeShader->map();
 }
 
 void VulkanEngineEntryPoint::prepareCompute() {
@@ -493,6 +464,12 @@ void VulkanEngineEntryPoint::prepareCompute() {
     outputAtmosphericLightLayoutBinding.binding = 2;
     outputAtmosphericLightLayoutBinding.descriptorCount = 1;
 
+    VkDescriptorSetLayoutBinding uniformBufferLayoutBinding{};
+    uniformBufferLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uniformBufferLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    uniformBufferLayoutBinding.binding = 3;
+    uniformBufferLayoutBinding.descriptorCount = 1;
+
     std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
             // Binding 0: Input image (read-only)
             inputImageLayoutBinding,
@@ -500,6 +477,8 @@ void VulkanEngineEntryPoint::prepareCompute() {
             outputImageLayoutBinding,
             // Binding 2: Output atmospheric light buffer (write)
             outputAtmosphericLightLayoutBinding,
+            // Binding 3: Uniform buffer with atmospheric light
+            uniformBufferLayoutBinding,
     };
 
     prepareComputePipeline(setLayoutBindings);
@@ -570,8 +549,9 @@ void VulkanEngineEntryPoint::render() {
                                 nullptr);
 
         vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
+        vkQueueWaitIdle(engineDevice.computeQueue());
+        getMaxAirlight();
 
-        // vkQueueWaitIdle(engineDevice.computeQueue());
         // Record graphics commandBuffer
         renderer.beginSwapChainRenderPass(bufferPair.graphicsCommandBuffer, darkChannelTexture.image);
 
@@ -618,9 +598,7 @@ void VulkanEngineEntryPoint::render() {
 
 
         vkQueueWaitIdle(engineDevice.graphicsQueue());
-
-        getMaxAirlight();
-
+        updateComputeUniformBuffer(glm::vec3(-1,-1,-1));
         if (PLAY_VIDEO) {
             // Prepare next frame
             frameIndex += 1;
@@ -640,55 +618,19 @@ void VulkanEngineEntryPoint::getMaxAirlight() {
     int32_t maxRed = 0;
     int32_t maxGreen = 0;
     int32_t maxBlue = 0;
-    for (int i = 0; i < airLightGroupsSize; i = i+3) {
+    for (int i = 0; i < airLightGroupsSize; i = i + 3) {
         if (airLightGroups[i] > maxRed) {
             maxRed = airLightGroups[i];
         }
-        if (airLightGroups[i+1] > maxGreen) {
-            maxGreen = airLightGroups[i+1];
+        if (airLightGroups[i + 1] > maxGreen) {
+            maxGreen = airLightGroups[i + 1];
         }
-        if (airLightGroups[i+2] > maxBlue) {
-            maxBlue = airLightGroups[i+2];
+        if (airLightGroups[i + 2] > maxBlue) {
+            maxBlue = airLightGroups[i + 2];
         }
     }
+    updateComputeUniformBuffer(glm::vec3(maxRed,maxGreen,maxBlue));
     fmt::print("Max airLight for frame {} is: {}R {}G {}B\n", frameIndex, maxRed, maxGreen, maxBlue);
-}
-
-void VulkanEngineEntryPoint::handleEvents() {
-    SDL_Event event;
-    while (SDL_PollEvent(&event) != 0) {
-        switch (event.type) {
-            case SDL_QUIT:
-                isRunning = false;
-                break;
-            case SDL_WINDOWEVENT:
-                if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
-                    SDL_Window *win = SDL_GetWindowFromID(event.window.windowID);
-                    int w;
-                    int h;
-                    SDL_GetWindowSize(win, &w, &h);
-                    window.onWindowResized(static_cast<uint32_t>(w), static_cast<uint32_t>(h));
-                }
-            default:
-                break;
-        }
-    }
-
-    const Uint8 *keystate = SDL_GetKeyboardState(nullptr);
-
-    if (keystate[SDL_SCANCODE_ESCAPE]) {
-        isRunning = false;
-    } else if (keystate[SDL_SCANCODE_S]) {
-        saveScreenshot(fmt::format("../screenshots/screenshot_frame_{}.png", frameIndex).c_str());
-    } else if (keystate[SDL_SCANCODE_LEFT]) {
-        if (frameIndex > SWEEP_FRAMES) {
-            frameIndex -= SWEEP_FRAMES;
-        }
-    } else if (keystate[SDL_SCANCODE_RIGHT]) {
-        if (frameIndex < totalFrames - SWEEP_FRAMES) {
-            frameIndex += SWEEP_FRAMES;
-        }
-    }
 }
 
 void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
@@ -716,11 +658,19 @@ void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
     outputAirLightBufferDescriptorSet.pBufferInfo = &airLightBuffer->getBufferInfo();
     outputAirLightBufferDescriptorSet.descriptorCount = 1;
 
+    VkWriteDescriptorSet computeUniformDescriptorSet{};
+    computeUniformDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    computeUniformDescriptorSet.dstSet = compute.at(0).descriptorSet;
+    computeUniformDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    computeUniformDescriptorSet.dstBinding = 3;
+    computeUniformDescriptorSet.pBufferInfo = &uniformBufferComputeShader->getBufferInfo();
+    computeUniformDescriptorSet.descriptorCount = 1;
 
     std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets = {
             inputImageDescriptorSet,
             outputImageDescriptorSet,
             outputAirLightBufferDescriptorSet,
+            computeUniformDescriptorSet,
     };
     vkUpdateDescriptorSets(engineDevice.getDevice(), computeWriteDescriptorSets.size(),
                            computeWriteDescriptorSets.data(), 0, nullptr);
@@ -732,7 +682,7 @@ void VulkanEngineEntryPoint::updateGraphicsDescriptorSets() {
     uniformDescriptorSet.dstSet = graphics.descriptorSetPreCompute;
     uniformDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     uniformDescriptorSet.dstBinding = 0;
-    uniformDescriptorSet.pBufferInfo = &uniformBufferVS->getBufferInfo();
+    uniformDescriptorSet.pBufferInfo = &uniformBufferVertexShader->getBufferInfo();
     uniformDescriptorSet.descriptorCount = 1;
 
     VkWriteDescriptorSet imageDescriptorSet{};
@@ -969,4 +919,85 @@ void VulkanEngineEntryPoint::insertImageMemoryBarrier(
             0, nullptr,
             0, nullptr,
             1, &imageMemoryBarrier);
+}
+
+VkPipelineShaderStageCreateInfo VulkanEngineEntryPoint::loadShader(std::string fileName, VkShaderStageFlagBits stage) {
+    VkPipelineShaderStageCreateInfo shaderStage = {};
+    shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaderStage.stage = stage;
+
+    shaderStage.module = loadShaderModule(fileName.c_str(), engineDevice.getDevice());
+
+    shaderStage.pName = "main";
+    assert(shaderStage.module != VK_NULL_HANDLE);
+    shaderModules.push_back(shaderStage.module);
+    return shaderStage;
+}
+
+VkShaderModule VulkanEngineEntryPoint::loadShaderModule(const char *fileName, VkDevice device) {
+    std::ifstream is(fileName, std::ios::binary | std::ios::in | std::ios::ate);
+
+    if (is.is_open()) {
+        size_t size = is.tellg();
+        is.seekg(0, std::ios::beg);
+        char *shaderCode = new char[size];
+        is.read(shaderCode, size);
+        is.close();
+
+        assert(size > 0);
+
+        VkShaderModule shaderModule;
+        VkShaderModuleCreateInfo moduleCreateInfo{};
+        moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        moduleCreateInfo.codeSize = size;
+        moduleCreateInfo.pCode = (uint32_t *) shaderCode;
+
+        if (vkCreateShaderModule(device, &moduleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create shader module!");
+        }
+
+        delete[] shaderCode;
+
+        return shaderModule;
+    } else {
+        std::cerr << "Error: Could not open shader file \"" << fileName << "\"" << "\n";
+        return VK_NULL_HANDLE;
+    }
+}
+
+void VulkanEngineEntryPoint::handleEvents() {
+    SDL_Event event;
+    while (SDL_PollEvent(&event) != 0) {
+        switch (event.type) {
+            case SDL_QUIT:
+                isRunning = false;
+                break;
+            case SDL_WINDOWEVENT:
+                if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
+                    SDL_Window *win = SDL_GetWindowFromID(event.window.windowID);
+                    int w;
+                    int h;
+                    SDL_GetWindowSize(win, &w, &h);
+                    window.onWindowResized(static_cast<uint32_t>(w), static_cast<uint32_t>(h));
+                }
+            default:
+                break;
+        }
+    }
+
+    const Uint8 *keystate = SDL_GetKeyboardState(nullptr);
+
+    if (keystate[SDL_SCANCODE_ESCAPE]) {
+        isRunning = false;
+    } else if (keystate[SDL_SCANCODE_S]) {
+        saveScreenshot(fmt::format("../screenshots/screenshot_frame_{}.png", frameIndex).c_str());
+    } else if (keystate[SDL_SCANCODE_LEFT]) {
+        if (frameIndex > SWEEP_FRAMES) {
+            frameIndex -= SWEEP_FRAMES;
+        }
+    } else if (keystate[SDL_SCANCODE_RIGHT]) {
+        if (frameIndex < totalFrames - SWEEP_FRAMES) {
+            frameIndex += SWEEP_FRAMES;
+        }
+    }
 }
