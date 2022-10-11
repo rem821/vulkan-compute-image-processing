@@ -21,7 +21,7 @@
 #define WINDOW_TITLE "Vulkan Compute Render Window"
 #define IMAGE_PATH "../assets/image.jpg"
 //#define VIDEO_PATH "/home/standa/3_1_1_1/camera_left_front/video.mp4"
-#define VIDEO_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_2/camera_left_front/video.mp4"
+#define VIDEO_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_1/camera_left_front/video.mp4"
 //#define VIDEO_PATH "../assets/video.mp4"
 #define WORKGROUP_COUNT (1024 / 32)
 #define PLAY_VIDEO true

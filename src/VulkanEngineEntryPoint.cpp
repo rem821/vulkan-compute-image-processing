@@ -39,7 +39,7 @@ VulkanEngineEntryPoint::VulkanEngineEntryPoint() {
     setupVertexDescriptions();
     prepareUniformBuffers();
     darkChannelTexture.createTextureTarget(engineDevice, inputTexture);
-    airLightBuffer = std::make_unique<VulkanEngineBuffer>(engineDevice, sizeof(int32_t), 1000,
+    airLightBuffer = std::make_unique<VulkanEngineBuffer>(engineDevice, sizeof(int32_t), 3000,
                                                           VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
@@ -635,15 +635,23 @@ void VulkanEngineEntryPoint::render() {
 
 void VulkanEngineEntryPoint::getMaxAirlight() {
     airLightBuffer->map();
-    int32_t *airlightGroups = static_cast<int32_t *>(airLightBuffer->getMappedMemory());
-    int32_t airlightGroupsSize = airLightBuffer->getBufferSize() / sizeof(int32_t);
-    int32_t maxAirlight = 0;
-    for (int i = 0; i < airlightGroupsSize; i++) {
-        if (airlightGroups[i] > maxAirlight) {
-            maxAirlight = airlightGroups[i];
+    auto *airLightGroups = static_cast<int32_t *>(airLightBuffer->getMappedMemory());
+    int32_t airLightGroupsSize = airLightBuffer->getBufferSize() / sizeof(int32_t);
+    int32_t maxRed = 0;
+    int32_t maxGreen = 0;
+    int32_t maxBlue = 0;
+    for (int i = 0; i < airLightGroupsSize; i = i+3) {
+        if (airLightGroups[i] > maxRed) {
+            maxRed = airLightGroups[i];
+        }
+        if (airLightGroups[i+1] > maxGreen) {
+            maxGreen = airLightGroups[i+1];
+        }
+        if (airLightGroups[i+2] > maxBlue) {
+            maxBlue = airLightGroups[i+2];
         }
     }
-    fmt::print("Max airlight for frame {} is: {}\n", frameIndex, maxAirlight);
+    fmt::print("Max airLight for frame {} is: {}R {}G {}B\n", frameIndex, maxRed, maxGreen, maxBlue);
 }
 
 void VulkanEngineEntryPoint::handleEvents() {
