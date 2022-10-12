@@ -10,6 +10,7 @@
 #include "rendering/VulkanEngineBuffer.h"
 #include "rendering/VulkanTexture.h"
 #include "rendering/Camera.h"
+#include "rendering/VulkanTools.h"
 
 #include "opencv4/opencv2/opencv.hpp"
 
@@ -48,9 +49,8 @@ public:
     } uboVertexShader;
 
     struct {
-        glm::vec3 airLight;
         glm::float32_t omega;
-    } uboComputeShader;
+    } computePushConstant;
 
     struct {
         VkDescriptorSetLayout descriptorSetLayout;
@@ -80,12 +80,10 @@ public:
     void prepareGraphicsPipeline();
     void setupDescriptorPool();
     void setupDescriptorSet();
-    void prepareComputeUniformBuffer();
     void prepareCompute();
 
     void updateComputeDescriptorSets();
     void updateGraphicsDescriptorSets();
-    void updateComputeUniformBuffer(glm::vec3 airLight);
 
     void render();
     void handleEvents();
@@ -103,18 +101,6 @@ private:
 
     void getMaxAirlight();
 
-    void insertImageMemoryBarrier(
-            VkCommandBuffer cmdbuffer,
-            VkImage image,
-            VkAccessFlags srcAccessMask,
-            VkAccessFlags dstAccessMask,
-            VkImageLayout oldImageLayout,
-            VkImageLayout newImageLayout,
-            VkPipelineStageFlags srcStageMask,
-            VkPipelineStageFlags dstStageMask,
-            VkImageSubresourceRange subresourceRange);
-
-
     VulkanEngineWindow window{WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE};
     VulkanEngineDevice engineDevice{window, WINDOW_TITLE};
     VulkanEngineRenderer renderer{window, engineDevice};
@@ -126,6 +112,7 @@ private:
 
     Texture2D inputTexture;
     Texture2D darkChannelTexture;
+    Texture2D outputTexture;
 
     std::unique_ptr<VulkanEngineBuffer> vertexBuffer;
     std::unique_ptr<VulkanEngineBuffer> indexBuffer;
