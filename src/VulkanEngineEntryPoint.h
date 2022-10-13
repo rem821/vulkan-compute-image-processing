@@ -11,28 +11,11 @@
 #include "rendering/VulkanTexture.h"
 #include "rendering/Camera.h"
 #include "rendering/VulkanTools.h"
+#include "GlobalConfiguration.h"
 
 #include "opencv4/opencv2/opencv.hpp"
 
 #include "glm/glm.hpp"
-
-#define VIDEO_DOWNSCALE_FACTOR 4
-#define WINDOW_WIDTH 1920
-#define WINDOW_HEIGHT 1080
-#define WINDOW_TITLE "Vulkan Compute Render Window"
-#define IMAGE_PATH "../assets/image.jpg"
-//#define VIDEO_PATH "/home/standa/3_1_1_1/camera_left_front/video.mp4"
-#define VIDEO_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_1/camera_left_front/video.mp4"
-//#define VIDEO_PATH "../assets/video.mp4"
-#define WORKGROUP_COUNT 16
-#define PLAY_VIDEO true
-#define RENDERDOC_ENABLED false
-#define RADIANCE_ENABLED true
-#define SWEEP_FRAMES 20
-
-#define TRANSMISSION_SHADER "ImageTransmission"
-#define MAXIMUM_AIRLIGHT_SHADER "MaximumAirLight"
-#define RADIANCE_SHADER "ImageRadiance"
 
 struct Vertex {
     float pos[3];
@@ -130,8 +113,6 @@ private:
     std::vector<Compute> compute;
 
     VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
-
-    std::vector<std::string> shaderNames;
 
     uint32_t indexCount;
 };

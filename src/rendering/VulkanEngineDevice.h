@@ -16,8 +16,7 @@
 #include <iostream>
 #include <unordered_set>
 
-#define VALIDATION_LAYER_NAME "VK_LAYER_LUNARG_standard_validation"
-//#define VALIDATION_LAYER_NAME "VK_LAYER_KHRONOS_validation"
+#include "../GlobalConfiguration.h"
 
 struct SwapChainSupportDetails {
     VkSurfaceCapabilitiesKHR capabilities;

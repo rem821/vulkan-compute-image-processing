@@ -364,19 +364,19 @@ void VulkanEngineEntryPoint::prepareGraphicsPipeline() {
 void VulkanEngineEntryPoint::setupDescriptorPool() {
     VkDescriptorPoolSize uniformBuffers{};
     uniformBuffers.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uniformBuffers.descriptorCount = 10;
+    uniformBuffers.descriptorCount = 100;
 
     VkDescriptorPoolSize imageSamplers{};
     imageSamplers.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    imageSamplers.descriptorCount = 10;
+    imageSamplers.descriptorCount = 100;
 
     VkDescriptorPoolSize storageImage{};
     storageImage.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    storageImage.descriptorCount = 10;
+    storageImage.descriptorCount = 100;
 
     VkDescriptorPoolSize storageBuffer{};
     storageImage.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    storageImage.descriptorCount = 10;
+    storageImage.descriptorCount = 100;
 
     std::vector<VkDescriptorPoolSize> poolSizes = {
             uniformBuffers,
@@ -389,7 +389,7 @@ void VulkanEngineEntryPoint::setupDescriptorPool() {
     descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     descriptorPoolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     descriptorPoolInfo.pPoolSizes = poolSizes.data();
-    descriptorPoolInfo.maxSets = 3;
+    descriptorPoolInfo.maxSets = 10;
 
     if (vkCreateDescriptorPool(engineDevice.getDevice(), &descriptorPoolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create descriptor pool!");
@@ -702,7 +702,7 @@ void VulkanEngineEntryPoint::render() {
                 vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
             }
 
-            if(RADIANCE_ENABLED) {
+            if (RADIANCE_ENABLED) {
                 // Wait
                 vkCmdPipelineBarrier(bufferPair.computeCommandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                                      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 0, nullptr);

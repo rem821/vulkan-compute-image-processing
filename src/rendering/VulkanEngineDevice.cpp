@@ -2,7 +2,6 @@
 // Created by Stanislav Svědiroh on 11.06.2022.
 //
 #include "VulkanEngineDevice.h"
-#include "../GlobalConfiguration.h"
 
 // local callback functions
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
