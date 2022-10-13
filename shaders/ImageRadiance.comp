@@ -1,0 +1,29 @@
+#version 450
+
+#define GROUP_SIZE 32
+
+layout (local_size_x = GROUP_SIZE, local_size_y = GROUP_SIZE) in;
+
+layout (binding = 0, rgba8) uniform readonly image2D inputImage;
+layout (binding = 1, rgba8) uniform readonly image2D transmissionImage;
+layout (binding = 2, rgba8) uniform image2D resultImage;
+layout (binding = 3) buffer AirLightMaxBuffer {
+    float channels[3];
+} airLightMaxData;
+layout (push_constant) uniform constants {
+    int groupCount;
+    float omega;
+} PushConstants;
+
+void main()
+{
+    vec3 I = imageLoad(inputImage, ivec2(gl_GlobalInvocationID.xy)).rgb;
+    vec3 A = vec3(airLightMaxData.channels[0], airLightMaxData.channels[1], airLightMaxData.channels[2]);
+    vec3 t = imageLoad(transmissionImage, ivec2(gl_GlobalInvocationID.xy)).rgb;
+
+    vec3 radiance = ((I - A) / t) + A;
+
+    //imageStore(resultImage, ivec2(gl_GlobalInvocationID.xy), res);
+    imageStore(resultImage, ivec2(gl_GlobalInvocationID.xy), vec4(radiance, 1.0f));
+
+}

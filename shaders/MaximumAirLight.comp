@@ -17,14 +17,14 @@ void main()
 
     // Find maximum airlight for each channel
     for (int i = 0; i < PushConstants.groupCount; i++) {
-        if (airLightGroupsData.groups[i][0] > airRed) {
-            airRed = airLightGroupsData.groups[i][0];
+        if (airLightGroupsData.groups[i][2] > airRed) {
+            airRed = airLightGroupsData.groups[i][2];
         }
         if (airLightGroupsData.groups[i][1] > airGreen) {
             airGreen = airLightGroupsData.groups[i][1];
         }
-        if (airLightGroupsData.groups[i][2] > airBlue) {
-            airBlue = airLightGroupsData.groups[i][2];
+        if (airLightGroupsData.groups[i][0] > airBlue) {
+            airBlue = airLightGroupsData.groups[i][0];
         }
     }
 

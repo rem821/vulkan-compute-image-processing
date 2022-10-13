@@ -24,13 +24,15 @@
 //#define VIDEO_PATH "/home/standa/3_1_1_1/camera_left_front/video.mp4"
 #define VIDEO_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_1/camera_left_front/video.mp4"
 //#define VIDEO_PATH "../assets/video.mp4"
-#define WORKGROUP_COUNT (1024 / 32)
+#define WORKGROUP_COUNT 16
 #define PLAY_VIDEO true
 #define RENDERDOC_ENABLED false
+#define RADIANCE_ENABLED true
 #define SWEEP_FRAMES 20
 
-#define DARK_CHANNEL_PRIOR "DarkChannelPrior"
-#define MAXIMUM_AIRLIGHT "MaximumAirLight"
+#define TRANSMISSION_SHADER "ImageTransmission"
+#define MAXIMUM_AIRLIGHT_SHADER "MaximumAirLight"
+#define RADIANCE_SHADER "ImageRadiance"
 
 struct Vertex {
     float pos[3];
@@ -102,8 +104,6 @@ private:
 
     void prepareComputePipeline(std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings, const std::string& shaderName);
 
-    void getMaxAirlight();
-
     VulkanEngineWindow window{WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE};
     VulkanEngineDevice engineDevice{window, WINDOW_TITLE};
     VulkanEngineRenderer renderer{window, engineDevice};
@@ -114,7 +114,7 @@ private:
     double totalFrames = video.get(cv::CAP_PROP_FRAME_COUNT);
 
     Texture2D inputTexture;
-    Texture2D darkChannelTexture;
+    Texture2D tempTexture;
     Texture2D outputTexture;
 
     std::unique_ptr<VulkanEngineBuffer> vertexBuffer;

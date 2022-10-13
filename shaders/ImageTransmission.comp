@@ -18,7 +18,7 @@ layout (push_constant) uniform constants {
     float omega;
 } PushConstants;
 
-const int kernelSize = 8;
+const int kernelSize = 16;
 
 struct ImageData
 {
@@ -87,13 +87,15 @@ void main()
     groupAirLights[gl_LocalInvocationID.x][gl_LocalInvocationID.y][1] = rgb.g;
     groupAirLights[gl_LocalInvocationID.x][gl_LocalInvocationID.y][2] = rgb.b;
 
+    // We don't need to continue if we're calculating transmission
+    if(PushConstants.omega > 0) return;
+
     groupMemoryBarrier();
     if (!(gl_LocalInvocationID.x == 0 && gl_LocalInvocationID.y == 0)) {
         return;
     }
 
-    // We don't need to continue if we're calculating transmission
-    if(PushConstants.omega > 0) return;
+
 
     float[3] brightestPixel = { 0.0f, 0.0f, 0.0f };
     for (int z = 0; z < 3; ++z) {
