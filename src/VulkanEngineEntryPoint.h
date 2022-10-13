@@ -26,9 +26,11 @@
 //#define VIDEO_PATH "../assets/video.mp4"
 #define WORKGROUP_COUNT (1024 / 32)
 #define PLAY_VIDEO true
+#define RENDERDOC_ENABLED false
 #define SWEEP_FRAMES 20
 
 #define DARK_CHANNEL_PRIOR "DarkChannelPrior"
+#define MAXIMUM_AIRLIGHT "MaximumAirLight"
 
 struct Vertex {
     float pos[3];
@@ -49,6 +51,7 @@ public:
     } uboVertexShader;
 
     struct {
+        glm::int32_t groupCount;
         glm::float32_t omega;
     } computePushConstant;
 
@@ -97,7 +100,7 @@ private:
     VkPipelineShaderStageCreateInfo loadShader(std::string fileName, VkShaderStageFlagBits stage);
     VkShaderModule loadShaderModule(const char *fileName, VkDevice device);
 
-    void prepareComputePipeline(std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings);
+    void prepareComputePipeline(std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings, const std::string& shaderName);
 
     void getMaxAirlight();
 
@@ -119,7 +122,8 @@ private:
 
     std::unique_ptr<VulkanEngineBuffer> uniformBufferVertexShader;
     std::unique_ptr<VulkanEngineBuffer> uniformBufferComputeShader;
-    std::unique_ptr<VulkanEngineBuffer> airLightBuffer;
+    std::unique_ptr<VulkanEngineBuffer> airLightGroupsBuffer;
+    std::unique_ptr<VulkanEngineBuffer> airLightMaxBuffer;
 
     std::vector<VkShaderModule> shaderModules;
 

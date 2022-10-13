@@ -1,0 +1,34 @@
+#version 450
+
+layout (binding = 0) buffer AirLightGroupsBuffer {
+    float groups[][3];
+} airLightGroupsData;
+layout (binding = 1) buffer AirLightMaxBuffer {
+    float channels[3];
+} airLightMaxData;
+layout (push_constant) uniform constants {
+    int groupCount;
+    float omega;
+} PushConstants;
+
+void main()
+{
+    float airRed = 0.0f, airGreen = 0.0f, airBlue = 0.0f;
+
+    // Find maximum airlight for each channel
+    for (int i = 0; i < PushConstants.groupCount; i++) {
+        if (airLightGroupsData.groups[i][0] > airRed) {
+            airRed = airLightGroupsData.groups[i][0];
+        }
+        if (airLightGroupsData.groups[i][1] > airGreen) {
+            airGreen = airLightGroupsData.groups[i][1];
+        }
+        if (airLightGroupsData.groups[i][2] > airBlue) {
+            airBlue = airLightGroupsData.groups[i][2];
+        }
+    }
+
+    airLightMaxData.channels[0] = airRed;
+    airLightMaxData.channels[1] = airGreen;
+    airLightMaxData.channels[2] = airBlue;
+}

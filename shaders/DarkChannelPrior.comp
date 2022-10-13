@@ -9,8 +9,12 @@ layout (binding = 1, rgba8) uniform readonly image2D darkChannelImage;
 layout (binding = 2, rgba8) uniform image2D resultImage;
 layout (binding = 3) buffer AirLightBuffer {
     float groups[][3];
-} airLightData;
+} airLightGroupsData;
+layout (binding = 4) buffer AirLightMaxBuffer {
+    float channels[3];
+} airLightMaxData;
 layout (push_constant) uniform constants {
+    int groupCount;
     float omega;
 } PushConstants;
 
@@ -28,25 +32,10 @@ void main()
     float airRed = 0.0f, airGreen = 0.0f, airBlue = 0.0f;
 
     // If we're calculating transmission (omega is set) find out airLights for each color component
-    // This is now computed on every group on second invocation wasting resources
-    // TODO: Find out a way to
     if (PushConstants.omega > 0) {
-        airRed = airLightData.groups[0][0];
-        airGreen = airLightData.groups[0][1];
-        airBlue = airLightData.groups[0][2];
-        /*
-        for (int i = 0; i < gl_NumWorkGroups.x * gl_NumWorkGroups.y; i++) {
-            if (airLightData.groups[i][0] > airRed) {
-                airRed = airLightData.groups[i][0];
-            }
-            if (airLightData.groups[i][1] > airGreen) {
-                airGreen = airLightData.groups[i][1];
-            }
-            if (airLightData.groups[i][2] > airBlue) {
-                airBlue = airLightData.groups[i][2];
-            }
-        }
-        */
+        airRed = airLightMaxData.channels[0];
+        airGreen = airLightMaxData.channels[1];
+        airBlue = airLightMaxData.channels[2];
     } else {
         // Make this equal to one to not cause any effect later if we're calculating dark channel prior
         airRed = 1.0f;
@@ -122,7 +111,7 @@ void main()
     //airLightData.groups[gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.y][1] = int(100);
     //airLightData.groups[gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.y][2] = int(200);
 
-    airLightData.groups[gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.y][0] = brightestPixel[0];
-    airLightData.groups[gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.y][1] = brightestPixel[1];
-    airLightData.groups[gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.y][2] = brightestPixel[2];
+    airLightGroupsData.groups[gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.y][0] = brightestPixel[0];
+    airLightGroupsData.groups[gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.y][1] = brightestPixel[1];
+    airLightGroupsData.groups[gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.y][2] = brightestPixel[2];
 }

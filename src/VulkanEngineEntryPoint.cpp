@@ -26,7 +26,7 @@ VulkanEngineEntryPoint::VulkanEngineEntryPoint() {
             int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void **) &rdoc_api);
             assert(ret == 1);
         }
-        if (rdoc_api) {
+        if (rdoc_api && RENDERDOC_ENABLED) {
             rdoc_api->TriggerCapture();
             rdoc_api->StartFrameCapture(engineDevice.getDevice(), window.sdlWindow());
         }
@@ -37,10 +37,19 @@ VulkanEngineEntryPoint::VulkanEngineEntryPoint() {
     darkChannelTexture.createTextureTarget(engineDevice, inputTexture);
     outputTexture.createTextureTarget(engineDevice, inputTexture);
 
-    airLightBuffer = std::make_unique<VulkanEngineBuffer>(engineDevice, sizeof(float), 3000,
-                                                          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                                                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    // Buffer holding maximum airlight components for every workgroup
+    airLightGroupsBuffer = std::make_unique<VulkanEngineBuffer>(engineDevice, sizeof(float),
+                                                                WORKGROUP_COUNT * WORKGROUP_COUNT * 3,
+                                                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    // Buffer holding maximum airlight components of the whole image
+    airLightMaxBuffer = std::make_unique<VulkanEngineBuffer>(engineDevice, sizeof(float), 3,
+                                                             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
 
     // Graphics
     generateQuad();
@@ -433,45 +442,84 @@ void VulkanEngineEntryPoint::setupDescriptorSet() {
 }
 
 void VulkanEngineEntryPoint::prepareCompute() {
-    VkDescriptorSetLayoutBinding inputImageLayoutBinding{};
-    inputImageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    inputImageLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    inputImageLayoutBinding.binding = 0;
-    inputImageLayoutBinding.descriptorCount = 1;
+    // Transmission calculation
+    {
+        VkDescriptorSetLayoutBinding inputImageLayoutBinding{};
+        inputImageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        inputImageLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        inputImageLayoutBinding.binding = 0;
+        inputImageLayoutBinding.descriptorCount = 1;
 
-    VkDescriptorSetLayoutBinding darkChannelImageLayoutBinding{};
-    darkChannelImageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    darkChannelImageLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    darkChannelImageLayoutBinding.binding = 1;
-    darkChannelImageLayoutBinding.descriptorCount = 1;
+        VkDescriptorSetLayoutBinding darkChannelImageLayoutBinding{};
+        darkChannelImageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        darkChannelImageLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        darkChannelImageLayoutBinding.binding = 1;
+        darkChannelImageLayoutBinding.descriptorCount = 1;
 
-    VkDescriptorSetLayoutBinding outputImageLayoutBinding{};
-    outputImageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    outputImageLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    outputImageLayoutBinding.binding = 2;
-    outputImageLayoutBinding.descriptorCount = 1;
+        VkDescriptorSetLayoutBinding outputImageLayoutBinding{};
+        outputImageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        outputImageLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        outputImageLayoutBinding.binding = 2;
+        outputImageLayoutBinding.descriptorCount = 1;
 
-    VkDescriptorSetLayoutBinding outputAtmosphericLightLayoutBinding{};
-    outputAtmosphericLightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    outputAtmosphericLightLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    outputAtmosphericLightLayoutBinding.binding = 3;
-    outputAtmosphericLightLayoutBinding.descriptorCount = 1;
+        VkDescriptorSetLayoutBinding outputAtmosphericLightLayoutBinding{};
+        outputAtmosphericLightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        outputAtmosphericLightLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        outputAtmosphericLightLayoutBinding.binding = 3;
+        outputAtmosphericLightLayoutBinding.descriptorCount = 1;
 
-    std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
-            // Binding 0: Input image (read-only)
-            inputImageLayoutBinding,
-            // Binding 1: Dark channel image (read-only)
-            darkChannelImageLayoutBinding,
-            // Binding 2: Output image (write)
-            outputImageLayoutBinding,
-            // Binding 3: Output atmospheric light buffer (read-write)
-            outputAtmosphericLightLayoutBinding,
-    };
+        VkDescriptorSetLayoutBinding inputMaxAtmosphericLightLayoutBinding{};
+        inputMaxAtmosphericLightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        inputMaxAtmosphericLightLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        inputMaxAtmosphericLightLayoutBinding.binding = 4;
+        inputMaxAtmosphericLightLayoutBinding.descriptorCount = 1;
 
-    prepareComputePipeline(setLayoutBindings);
+
+        std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
+                // Binding 0: Input image (read-only)
+                inputImageLayoutBinding,
+                // Binding 1: Dark channel image (read-only)
+                darkChannelImageLayoutBinding,
+                // Binding 2: Output image (write)
+                outputImageLayoutBinding,
+                // Binding 3: Output atmospheric light buffer (write)
+                outputAtmosphericLightLayoutBinding,
+                // Binding 4: Input max atmospheric light buffer (read-only)
+                inputMaxAtmosphericLightLayoutBinding
+        };
+
+        prepareComputePipeline(setLayoutBindings, (std::string) DARK_CHANNEL_PRIOR);
+    }
+
+    // Maximum airLight calculation
+    {
+        VkDescriptorSetLayoutBinding inputAtmosphericLightLayoutBinding{};
+        inputAtmosphericLightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        inputAtmosphericLightLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        inputAtmosphericLightLayoutBinding.binding = 0;
+        inputAtmosphericLightLayoutBinding.descriptorCount = 1;
+
+        VkDescriptorSetLayoutBinding outputAtmosphericLightLayoutBinding{};
+        outputAtmosphericLightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        outputAtmosphericLightLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        outputAtmosphericLightLayoutBinding.binding = 1;
+        outputAtmosphericLightLayoutBinding.descriptorCount = 1;
+
+        std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
+                // Binding 2: Output image (read-only)
+                inputAtmosphericLightLayoutBinding,
+                // Binding 3: Output atmospheric light buffer (write)
+                outputAtmosphericLightLayoutBinding,
+        };
+
+        prepareComputePipeline(setLayoutBindings, (std::string) MAXIMUM_AIRLIGHT);
+    }
+
+    updateComputeDescriptorSets();
 }
 
-void VulkanEngineEntryPoint::prepareComputePipeline(std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings) {
+void VulkanEngineEntryPoint::prepareComputePipeline(std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings,
+                                                    const std::string &shaderName) {
     compute.emplace_back();
     uint32_t pipelineIndex = compute.size() - 1;
 
@@ -512,15 +560,13 @@ void VulkanEngineEntryPoint::prepareComputePipeline(std::vector<VkDescriptorSetL
         throw std::runtime_error("Failed to allocate descriptor sets for compute!");
     }
 
-    updateComputeDescriptorSets();
-
     // Create compute shader pipelines
     VkComputePipelineCreateInfo computePipelineCreateInfo{};
     computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
     computePipelineCreateInfo.layout = compute.at(pipelineIndex).pipelineLayout;
     computePipelineCreateInfo.flags = 0;
 
-    std::string fileName = "../shaders/" + (std::string) DARK_CHANNEL_PRIOR + ".comp.spv";
+    std::string fileName = "../shaders/" + shaderName + ".comp.spv";
     computePipelineCreateInfo.stage = loadShader(fileName, VK_SHADER_STAGE_COMPUTE_BIT);
     VkPipeline pipeline;
     if (vkCreateComputePipelines(engineDevice.getDevice(), VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr,
@@ -535,54 +581,86 @@ void VulkanEngineEntryPoint::render() {
     if (bufferPair.computeCommandBuffer != nullptr && bufferPair.graphicsCommandBuffer != nullptr) {
         // Record compute command buffer
         {
-            computePushConstant.omega = -1.0;
-            vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                              compute.at(0).pipeline);
-            vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                    compute.at(0).pipelineLayout,
-                                    0, 1, &compute.at(0).descriptorSet, 0,
-                                    nullptr);
+            // First ComputeShader call -> calculate DarkChannelPrior + maxAirLight channels for each workgroup
+            {
+                computePushConstant.groupCount = WORKGROUP_COUNT * WORKGROUP_COUNT;
+                computePushConstant.omega = -1.0;
+                vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                  compute.at(0).pipeline);
+                vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                        compute.at(0).pipelineLayout,
+                                        0, 1, &compute.at(0).descriptorSet, 0,
+                                        nullptr);
 
-            vkCmdPushConstants(bufferPair.computeCommandBuffer, compute.at(0).pipelineLayout,
-                               VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(computePushConstant), &computePushConstant);
-            vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
+                vkCmdPushConstants(bufferPair.computeCommandBuffer, compute.at(0).pipelineLayout,
+                                   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(computePushConstant), &computePushConstant);
+                vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
+
+            }
+
+            // Wait
             vkCmdPipelineBarrier(bufferPair.computeCommandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                                  VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 0, nullptr);
-            setImageLayout(bufferPair.computeCommandBuffer,
-                           inputTexture.image,
-                           VK_IMAGE_ASPECT_COLOR_BIT,
-                           VK_IMAGE_LAYOUT_GENERAL,
-                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                           VK_PIPELINE_STAGE_TRANSFER_BIT,
-                           VK_PIPELINE_STAGE_TRANSFER_BIT);
-            setImageLayout(bufferPair.computeCommandBuffer,
-                           darkChannelTexture.image,
-                           VK_IMAGE_ASPECT_COLOR_BIT,
-                           VK_IMAGE_LAYOUT_UNDEFINED,
-                           VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                           VK_PIPELINE_STAGE_TRANSFER_BIT,
-                           VK_PIPELINE_STAGE_TRANSFER_BIT);
-            VkImageCopy imageCopyRegion{};
-            imageCopyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            imageCopyRegion.srcSubresource.layerCount = 1;
-            imageCopyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            imageCopyRegion.dstSubresource.layerCount = 1;
-            imageCopyRegion.extent.width = inputTexture.width;
-            imageCopyRegion.extent.height = inputTexture.height;
-            imageCopyRegion.extent.depth = 1;
+            // Second ComputeShader call -> Calculate maximum airLight channels on a single thread
+            {
+                vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                  compute.at(1).pipeline);
+                vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                        compute.at(1).pipelineLayout,
+                                        0, 1, &compute.at(1).descriptorSet, 0,
+                                        nullptr);
+                vkCmdPushConstants(bufferPair.computeCommandBuffer, compute.at(1).pipelineLayout,
+                                   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(computePushConstant), &computePushConstant);
+                vkCmdDispatch(bufferPair.computeCommandBuffer, 1, 1, 1);
+            }
+            // Wait
+            vkCmdPipelineBarrier(bufferPair.computeCommandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                                 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 0, nullptr);
+            // Third ComputeShader call -> calculate transmission
+            {
+                setImageLayout(bufferPair.computeCommandBuffer,
+                               inputTexture.image,
+                               VK_IMAGE_ASPECT_COLOR_BIT,
+                               VK_IMAGE_LAYOUT_GENERAL,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                               VK_PIPELINE_STAGE_TRANSFER_BIT,
+                               VK_PIPELINE_STAGE_TRANSFER_BIT);
+                setImageLayout(bufferPair.computeCommandBuffer,
+                               darkChannelTexture.image,
+                               VK_IMAGE_ASPECT_COLOR_BIT,
+                               VK_IMAGE_LAYOUT_UNDEFINED,
+                               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                               VK_PIPELINE_STAGE_TRANSFER_BIT,
+                               VK_PIPELINE_STAGE_TRANSFER_BIT);
+                VkImageCopy imageCopyRegion{};
+                imageCopyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                imageCopyRegion.srcSubresource.layerCount = 1;
+                imageCopyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                imageCopyRegion.dstSubresource.layerCount = 1;
+                imageCopyRegion.extent.width = inputTexture.width;
+                imageCopyRegion.extent.height = inputTexture.height;
+                imageCopyRegion.extent.depth = 1;
 
-            // Issue the copy command
-            vkCmdCopyImage(
-                    bufferPair.computeCommandBuffer,
-                    outputTexture.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                    darkChannelTexture.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                    1,
-                    &imageCopyRegion);
+                // Issue the copy command
+                vkCmdCopyImage(
+                        bufferPair.computeCommandBuffer,
+                        outputTexture.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        darkChannelTexture.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        1,
+                        &imageCopyRegion);
 
-            computePushConstant.omega = 0.98;
-            vkCmdPushConstants(bufferPair.computeCommandBuffer, compute.at(0).pipelineLayout,
-                               VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(computePushConstant), &computePushConstant);
-            vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
+                computePushConstant.omega = 0.98;
+                vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                  compute.at(0).pipeline);
+                vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                        compute.at(0).pipelineLayout,
+                                        0, 1, &compute.at(0).descriptorSet, 0,
+                                        nullptr);
+                vkCmdPushConstants(bufferPair.computeCommandBuffer, compute.at(0).pipelineLayout,
+                                   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(computePushConstant), &computePushConstant);
+                vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
+            }
+
         }
 
         // Record graphics commandBuffer
@@ -642,13 +720,13 @@ void VulkanEngineEntryPoint::render() {
         updateComputeDescriptorSets();
         updateGraphicsDescriptorSets();
     }
-    if (rdoc_api) rdoc_api->EndFrameCapture(engineDevice.getDevice(), window.sdlWindow());
+    if (rdoc_api && RENDERDOC_ENABLED) rdoc_api->EndFrameCapture(engineDevice.getDevice(), window.sdlWindow());
 }
 
 void VulkanEngineEntryPoint::getMaxAirlight() {
-    airLightBuffer->map();
-    auto *airLightGroups = static_cast<int32_t *>(airLightBuffer->getMappedMemory());
-    int32_t airLightGroupsSize = airLightBuffer->getBufferSize() / sizeof(int32_t);
+    airLightGroupsBuffer->map();
+    auto *airLightGroups = static_cast<int32_t *>(airLightGroupsBuffer->getMappedMemory());
+    int32_t airLightGroupsSize = airLightGroupsBuffer->getBufferSize() / sizeof(int32_t);
     int32_t maxRed = 0;
     int32_t maxGreen = 0;
     int32_t maxBlue = 0;
@@ -668,46 +746,83 @@ void VulkanEngineEntryPoint::getMaxAirlight() {
 }
 
 void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
-    VkWriteDescriptorSet inputImageDescriptorSet{};
-    inputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    inputImageDescriptorSet.dstSet = compute.at(0).descriptorSet;
-    inputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    inputImageDescriptorSet.dstBinding = 0;
-    inputImageDescriptorSet.pImageInfo = &inputTexture.descriptor;
-    inputImageDescriptorSet.descriptorCount = 1;
+    // Transmission calculation
+    {
+        VkWriteDescriptorSet inputImageDescriptorSet{};
+        inputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        inputImageDescriptorSet.dstSet = compute.at(0).descriptorSet;
+        inputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        inputImageDescriptorSet.dstBinding = 0;
+        inputImageDescriptorSet.pImageInfo = &inputTexture.descriptor;
+        inputImageDescriptorSet.descriptorCount = 1;
 
-    VkWriteDescriptorSet darkChannelImageDescriptorSet{};
-    darkChannelImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    darkChannelImageDescriptorSet.dstSet = compute.at(0).descriptorSet;
-    darkChannelImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    darkChannelImageDescriptorSet.dstBinding = 1;
-    darkChannelImageDescriptorSet.pImageInfo = &darkChannelTexture.descriptor;
-    darkChannelImageDescriptorSet.descriptorCount = 1;
+        VkWriteDescriptorSet darkChannelImageDescriptorSet{};
+        darkChannelImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        darkChannelImageDescriptorSet.dstSet = compute.at(0).descriptorSet;
+        darkChannelImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        darkChannelImageDescriptorSet.dstBinding = 1;
+        darkChannelImageDescriptorSet.pImageInfo = &darkChannelTexture.descriptor;
+        darkChannelImageDescriptorSet.descriptorCount = 1;
 
-    VkWriteDescriptorSet outputImageDescriptorSet{};
-    outputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    outputImageDescriptorSet.dstSet = compute.at(0).descriptorSet;
-    outputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    outputImageDescriptorSet.dstBinding = 2;
-    outputImageDescriptorSet.pImageInfo = &outputTexture.descriptor;
-    outputImageDescriptorSet.descriptorCount = 1;
+        VkWriteDescriptorSet outputImageDescriptorSet{};
+        outputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        outputImageDescriptorSet.dstSet = compute.at(0).descriptorSet;
+        outputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        outputImageDescriptorSet.dstBinding = 2;
+        outputImageDescriptorSet.pImageInfo = &outputTexture.descriptor;
+        outputImageDescriptorSet.descriptorCount = 1;
 
-    VkWriteDescriptorSet outputAirLightBufferDescriptorSet{};
-    outputAirLightBufferDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    outputAirLightBufferDescriptorSet.dstSet = compute.at(0).descriptorSet;
-    outputAirLightBufferDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    outputAirLightBufferDescriptorSet.dstBinding = 3;
-    outputAirLightBufferDescriptorSet.pBufferInfo = &airLightBuffer->getBufferInfo();
-    outputAirLightBufferDescriptorSet.descriptorCount = 1;
+        VkWriteDescriptorSet outputAirLightBufferDescriptorSet{};
+        outputAirLightBufferDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        outputAirLightBufferDescriptorSet.dstSet = compute.at(0).descriptorSet;
+        outputAirLightBufferDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        outputAirLightBufferDescriptorSet.dstBinding = 3;
+        outputAirLightBufferDescriptorSet.pBufferInfo = &airLightGroupsBuffer->getBufferInfo();
+        outputAirLightBufferDescriptorSet.descriptorCount = 1;
 
-    std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets = {
-            inputImageDescriptorSet,
-            darkChannelImageDescriptorSet,
-            outputImageDescriptorSet,
-            outputAirLightBufferDescriptorSet,
-    };
-    vkUpdateDescriptorSets(engineDevice.getDevice(), computeWriteDescriptorSets.size(),
-                           computeWriteDescriptorSets.data(), 0, nullptr);
+        VkWriteDescriptorSet inputMaxAirLightBufferDescriptorSet{};
+        inputMaxAirLightBufferDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        inputMaxAirLightBufferDescriptorSet.dstSet = compute.at(0).descriptorSet;
+        inputMaxAirLightBufferDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        inputMaxAirLightBufferDescriptorSet.dstBinding = 4;
+        inputMaxAirLightBufferDescriptorSet.pBufferInfo = &airLightMaxBuffer->getBufferInfo();
+        inputMaxAirLightBufferDescriptorSet.descriptorCount = 1;
+
+        std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets = {
+                inputImageDescriptorSet,
+                darkChannelImageDescriptorSet,
+                outputImageDescriptorSet,
+                outputAirLightBufferDescriptorSet,
+                inputMaxAirLightBufferDescriptorSet,
+        };
+        vkUpdateDescriptorSets(engineDevice.getDevice(), computeWriteDescriptorSets.size(),
+                               computeWriteDescriptorSets.data(), 0, nullptr);
+    }
+    // Maximum airLight calculation
+    {
+        VkWriteDescriptorSet inputAirLightBufferDescriptorSet{};
+        inputAirLightBufferDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        inputAirLightBufferDescriptorSet.dstSet = compute.at(1).descriptorSet;
+        inputAirLightBufferDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        inputAirLightBufferDescriptorSet.dstBinding = 0;
+        inputAirLightBufferDescriptorSet.pBufferInfo = &airLightGroupsBuffer->getBufferInfo();
+        inputAirLightBufferDescriptorSet.descriptorCount = 1;
+
+        VkWriteDescriptorSet outputAirLightBufferDescriptorSet{};
+        outputAirLightBufferDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        outputAirLightBufferDescriptorSet.dstSet = compute.at(1).descriptorSet;
+        outputAirLightBufferDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        outputAirLightBufferDescriptorSet.dstBinding = 1;
+        outputAirLightBufferDescriptorSet.pBufferInfo = &airLightMaxBuffer->getBufferInfo();
+        outputAirLightBufferDescriptorSet.descriptorCount = 1;
+
+        std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets = {
+                inputAirLightBufferDescriptorSet,
+                outputAirLightBufferDescriptorSet,
+        };
+        vkUpdateDescriptorSets(engineDevice.getDevice(), computeWriteDescriptorSets.size(),
+                               computeWriteDescriptorSets.data(), 0, nullptr);
+    }
 }
 
 void VulkanEngineEntryPoint::updateGraphicsDescriptorSets() {
