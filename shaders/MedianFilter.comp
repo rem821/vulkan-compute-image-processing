@@ -1,0 +1,49 @@
+#version 450
+
+#define GROUP_SIZE 32
+
+layout (local_size_x = GROUP_SIZE, local_size_y = GROUP_SIZE) in;
+layout (binding = 0, rgba8) uniform readonly image2D inputImage;
+layout (binding = 1, rgba8) uniform image2D resultImage;
+
+/* Function to sort an array using insertion sort*/
+float[49] insertionSort(float arr[49])
+{
+    int i, j;
+    float key;
+    for (i = 1; i < 49; i++)
+    {
+        key = arr[i];
+        j = i - 1;
+
+        /* Move elements of arr[0..i-1], that are
+        greater than key, to one position ahead
+        of their current position */
+        while (j >= 0 && arr[j] > key)
+        {
+            arr[j + 1] = arr[j];
+            j = j - 1;
+        }
+        arr[j + 1] = key;
+    }
+    return arr;
+}
+
+void main()
+{
+    float pix[49];
+    // Fetch neighbouring texels
+    int n = -1;
+    for (int i = -3; i < 4; ++i)
+    {
+        for (int j = -3; j < 4; ++j)
+        {
+            n++;
+            pix[n] = imageLoad(inputImage, ivec2(gl_GlobalInvocationID.x + i, gl_GlobalInvocationID.y + j)).r;
+        }
+    }
+    pix = insertionSort(pix);
+    float med = (pix[0] + pix[10] + pix[20] + pix[30] + pix[40] + pix[48]) / 6.0f;
+    vec4 res = vec4(med, med , med, 1.0f);
+    imageStore(resultImage, ivec2(gl_GlobalInvocationID.xy), res);
+}

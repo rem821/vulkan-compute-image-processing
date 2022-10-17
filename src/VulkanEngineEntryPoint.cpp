@@ -651,7 +651,7 @@ void VulkanEngineEntryPoint::render() {
     CommandBufferPair bufferPair = renderer.beginFrame();
     if (bufferPair.computeCommandBuffer != nullptr && bufferPair.graphicsCommandBuffer != nullptr) {
         // Record compute command buffer
-        {
+        if (PLAY_VIDEO || frameIndex == 0) {
             // First ComputeShader call -> calculate DarkChannelPrior + maxAirLight channels for each workgroup
             {
                 computePushConstant.groupCount = WORKGROUP_COUNT * WORKGROUP_COUNT;
@@ -691,38 +691,8 @@ void VulkanEngineEntryPoint::render() {
 
             // Third ComputeShader call -> calculate transmission
             {
-                setImageLayout(bufferPair.computeCommandBuffer,
-                               tempTexture.image,
-                               VK_IMAGE_ASPECT_COLOR_BIT,
-                               VK_IMAGE_LAYOUT_GENERAL,
-                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                               VK_PIPELINE_STAGE_TRANSFER_BIT,
-                               VK_PIPELINE_STAGE_TRANSFER_BIT);
-                setImageLayout(bufferPair.computeCommandBuffer,
-                               outputTexture.image,
-                               VK_IMAGE_ASPECT_COLOR_BIT,
-                               VK_IMAGE_LAYOUT_UNDEFINED,
-                               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                               VK_PIPELINE_STAGE_TRANSFER_BIT,
-                               VK_PIPELINE_STAGE_TRANSFER_BIT);
-                VkImageCopy imageCopyRegion{};
-                imageCopyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                imageCopyRegion.srcSubresource.layerCount = 1;
-                imageCopyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                imageCopyRegion.dstSubresource.layerCount = 1;
-                imageCopyRegion.extent.width = inputTexture.width;
-                imageCopyRegion.extent.height = inputTexture.height;
-                imageCopyRegion.extent.depth = 1;
-
-                // Issue the copy command
-                vkCmdCopyImage(
-                        bufferPair.computeCommandBuffer,
-                        outputTexture.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                        tempTexture.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                        1,
-                        &imageCopyRegion);
-
-                computePushConstant.omega = 0.98;
+                moveOutputTextureToTemp(bufferPair);
+                computePushConstant.omega = 0.95;
                 vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
                                   compute.at(0).pipeline);
                 vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -735,38 +705,8 @@ void VulkanEngineEntryPoint::render() {
             }
 
             // Fourth ComputeShader call -> Refine transmission with Guided filter
-            if(0 == 0){
-                setImageLayout(bufferPair.computeCommandBuffer,
-                               tempTexture.image,
-                               VK_IMAGE_ASPECT_COLOR_BIT,
-                               VK_IMAGE_LAYOUT_GENERAL,
-                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                               VK_PIPELINE_STAGE_TRANSFER_BIT,
-                               VK_PIPELINE_STAGE_TRANSFER_BIT);
-                setImageLayout(bufferPair.computeCommandBuffer,
-                               outputTexture.image,
-                               VK_IMAGE_ASPECT_COLOR_BIT,
-                               VK_IMAGE_LAYOUT_UNDEFINED,
-                               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                               VK_PIPELINE_STAGE_TRANSFER_BIT,
-                               VK_PIPELINE_STAGE_TRANSFER_BIT);
-                VkImageCopy imageCopyRegion{};
-                imageCopyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                imageCopyRegion.srcSubresource.layerCount = 1;
-                imageCopyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                imageCopyRegion.dstSubresource.layerCount = 1;
-                imageCopyRegion.extent.width = inputTexture.width;
-                imageCopyRegion.extent.height = inputTexture.height;
-                imageCopyRegion.extent.depth = 1;
-
-                // Issue the copy command
-                vkCmdCopyImage(
-                        bufferPair.computeCommandBuffer,
-                        outputTexture.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                        tempTexture.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                        1,
-                        &imageCopyRegion);
-
+            if(GUIDED_FILTER_ENABLED){
+                moveOutputTextureToTemp(bufferPair);
                 vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
                                   compute.at(2).pipeline);
                 vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -785,37 +725,7 @@ void VulkanEngineEntryPoint::render() {
 
                 // Fifth ComputeShader call -> calculate radiance
                 {
-                    setImageLayout(bufferPair.computeCommandBuffer,
-                                   tempTexture.image,
-                                   VK_IMAGE_ASPECT_COLOR_BIT,
-                                   VK_IMAGE_LAYOUT_GENERAL,
-                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                   VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                   VK_PIPELINE_STAGE_TRANSFER_BIT);
-                    setImageLayout(bufferPair.computeCommandBuffer,
-                                   outputTexture.image,
-                                   VK_IMAGE_ASPECT_COLOR_BIT,
-                                   VK_IMAGE_LAYOUT_UNDEFINED,
-                                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                                   VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                   VK_PIPELINE_STAGE_TRANSFER_BIT);
-                    VkImageCopy imageCopyRegion{};
-                    imageCopyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                    imageCopyRegion.srcSubresource.layerCount = 1;
-                    imageCopyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                    imageCopyRegion.dstSubresource.layerCount = 1;
-                    imageCopyRegion.extent.width = inputTexture.width;
-                    imageCopyRegion.extent.height = inputTexture.height;
-                    imageCopyRegion.extent.depth = 1;
-
-                    // Issue the copy command
-                    vkCmdCopyImage(
-                            bufferPair.computeCommandBuffer,
-                            outputTexture.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                            tempTexture.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                            1,
-                            &imageCopyRegion);
-
+                    moveOutputTextureToTemp(bufferPair);
                     vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
                                       compute.at(3).pipeline);
                     vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -879,12 +789,12 @@ void VulkanEngineEntryPoint::render() {
         renderer.endFrame();
 
         vkQueueWaitIdle(engineDevice.graphicsQueue());
-        if (PLAY_VIDEO) {
-            // Prepare next frame
-            frameIndex += 1;
-            fmt::print("Preparing frame {}\n", frameIndex);
-            prepareInputImage();
-        }
+
+        // Prepare next frame
+        frameIndex += 1;
+        fmt::print("Preparing frame {}\n", frameIndex);
+        prepareInputImage();
+
         updateComputeDescriptorSets();
         updateGraphicsDescriptorSets();
     }
@@ -1334,4 +1244,37 @@ void VulkanEngineEntryPoint::handleEvents() {
             frameIndex += SWEEP_FRAMES;
         }
     }
+}
+
+void VulkanEngineEntryPoint::moveOutputTextureToTemp(CommandBufferPair bufferPair) {
+    setImageLayout(bufferPair.computeCommandBuffer,
+                   tempTexture.image,
+                   VK_IMAGE_ASPECT_COLOR_BIT,
+                   VK_IMAGE_LAYOUT_GENERAL,
+                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                   VK_PIPELINE_STAGE_TRANSFER_BIT,
+                   VK_PIPELINE_STAGE_TRANSFER_BIT);
+    setImageLayout(bufferPair.computeCommandBuffer,
+                   outputTexture.image,
+                   VK_IMAGE_ASPECT_COLOR_BIT,
+                   VK_IMAGE_LAYOUT_UNDEFINED,
+                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                   VK_PIPELINE_STAGE_TRANSFER_BIT,
+                   VK_PIPELINE_STAGE_TRANSFER_BIT);
+    VkImageCopy imageCopyRegion{};
+    imageCopyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    imageCopyRegion.srcSubresource.layerCount = 1;
+    imageCopyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    imageCopyRegion.dstSubresource.layerCount = 1;
+    imageCopyRegion.extent.width = inputTexture.width;
+    imageCopyRegion.extent.height = inputTexture.height;
+    imageCopyRegion.extent.depth = 1;
+
+    // Issue the copy command
+    vkCmdCopyImage(
+            bufferPair.computeCommandBuffer,
+            outputTexture.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            tempTexture.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            1,
+            &imageCopyRegion);
 }

@@ -12,10 +12,10 @@ layout (push_constant) uniform constants {
     float omega;
 } PushConstants;
 
-const int kernelSize = 9;
+const int kernelSize = 3;
 const int kernelElements = kernelSize * kernelSize;
 
-const float eps = 0.000001;
+const float eps = 0.1;
 
 struct RGBData
 {
@@ -32,7 +32,7 @@ float conv(in float[kernelElements] kernel, in float[kernelElements] data)
     {
         res += kernel[i] * data[i];
     }
-    return clamp(res / kernelElements, 0.0, 1.0);
+    return res / kernelElements;
 }
 
 RGBData guideImageLoadPatch() {
@@ -109,15 +109,15 @@ void main()
     float cov_I_p_g = conv(meanKernel, elemMult(I.green, p)) - (mean_I.g * mean_p);
     float cov_I_p_b = conv(meanKernel, elemMult(I.blue, p)) - (mean_I.b * mean_p);
 
-    vec3 cov_I = vec3(cov_I_p_r, cov_I_p_g, cov_I_p_b);
-    vec3 a = cov_I * inverse(var_I);
-    float b = mean_p * (a.r * mean_I.r + a.g * mean_I.g + a.b + mean_I.b);
+    vec3 cov_I_p = vec3(cov_I_p_r, cov_I_p_g, cov_I_p_b);
+    vec3 a = cov_I_p * inverse(var_I);
+    float b = mean_p - (a.r * mean_I.r + a.g * mean_I.g + a.b + mean_I.b);
 
     vec3 I_pix = vec3(I.red[kernelElements / 2], I.green[kernelElements / 2], I.blue[kernelElements / 2]);
     float q = (a.r * I_pix.r + a.g * I_pix.g + a.b * I_pix.b) + b;
 
-    vec4 res = vec4(a.r, a.r, a.r, 1.0);
-    //vec4 res = vec4(q, q, q, 1.0);
+    //vec4 res = vec4(b, b, b,  1.0);
+    vec4 res = vec4(q, q, q, 1.0);
     //imageStore(resultImage, ivec2(gl_GlobalInvocationID.xy), vec4(1.0, 0.0, 1.0, 1.0));
     imageStore(resultImage, ivec2(gl_GlobalInvocationID.xy), res);
 }

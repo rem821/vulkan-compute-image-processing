@@ -8,7 +8,7 @@
 //  1 --> Work PC (AMD Radeon card)
 //  2 --> Macbook Pro  16" 2019 (AMD Radeon card)
 
-#define DEVICE_TYPE 1
+#define DEVICE_TYPE 0
 
 #if DEVICE_TYPE == 0
 
@@ -20,9 +20,9 @@
 #define VALIDATION_LAYER_NAME "VK_LAYER_LUNARG_standard_validation"
 
 // Content section
-#define VIDEO_DOWNSCALE_FACTOR 2
+#define VIDEO_DOWNSCALE_FACTOR 4
 #define VIDEO_PATH "/home/standa/3_1_1_1/camera_left_front/video.mp4"
-#define IMAGE_PATH "../assets/image.png"
+#define IMAGE_PATH "../assets/image4.jpg"
 #define PLAY_VIDEO true
 
 // Debugging section
@@ -31,7 +31,8 @@
 #define SWEEP_FRAMES 20
 
 // Shaders section
-#define RADIANCE_ENABLED true
+#define GUIDED_FILTER_ENABLED true
+#define RADIANCE_ENABLED false
 #define TRANSMISSION_SHADER "ImageTransmission"
 #define MAXIMUM_AIRLIGHT_SHADER "MaximumAirLight"
 #define GUIDED_FILTER_SHADER "GuidedFilter"
@@ -59,6 +60,7 @@
 #define SWEEP_FRAMES 20
 
 // Shaders section
+#define GUIDED_FILTER_ENABLED false
 #define RADIANCE_ENABLED false
 #define TRANSMISSION_SHADER "ImageTransmission"
 #define MAXIMUM_AIRLIGHT_SHADER "MaximumAirLight"
@@ -87,6 +89,7 @@
 #define SWEEP_FRAMES 20
 
 // Shaders section
+#define GUIDED_FILTER_ENABLED false
 #define RADIANCE_ENABLED true
 #define TRANSMISSION_SHADER "ImageTransmission"
 #define MAXIMUM_AIRLIGHT_SHADER "MaximumAirLight"
