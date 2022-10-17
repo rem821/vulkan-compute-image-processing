@@ -514,6 +514,38 @@ void VulkanEngineEntryPoint::prepareCompute() {
         prepareComputePipeline(setLayoutBindings, (std::string) MAXIMUM_AIRLIGHT_SHADER);
     }
 
+    // Guided Filter
+    {
+        VkDescriptorSetLayoutBinding guideImageLayoutBinding{};
+        guideImageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        guideImageLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        guideImageLayoutBinding.binding = 0;
+        guideImageLayoutBinding.descriptorCount = 1;
+
+        VkDescriptorSetLayoutBinding filterInputImageLayoutBinding{};
+        filterInputImageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        filterInputImageLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        filterInputImageLayoutBinding.binding = 1;
+        filterInputImageLayoutBinding.descriptorCount = 1;
+
+        VkDescriptorSetLayoutBinding outputImageLayoutBinding{};
+        outputImageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        outputImageLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        outputImageLayoutBinding.binding = 2;
+        outputImageLayoutBinding.descriptorCount = 1;
+
+        std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
+                // Binding 0: Input Guide Image (read-only)
+                guideImageLayoutBinding,
+                // Binding 1: Input Filter Image (read-only)
+                filterInputImageLayoutBinding,
+                // Binding 2: Output Image (write)
+                outputImageLayoutBinding,
+        };
+
+        prepareComputePipeline(setLayoutBindings, (std::string) GUIDED_FILTER_SHADER);
+    }
+
     // Radiance calculation
     {
         VkDescriptorSetLayoutBinding inputImageLayoutBinding{};
@@ -702,12 +734,56 @@ void VulkanEngineEntryPoint::render() {
                 vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
             }
 
+            // Fourth ComputeShader call -> Refine transmission with Guided filter
+            if(0 == 0){
+                setImageLayout(bufferPair.computeCommandBuffer,
+                               tempTexture.image,
+                               VK_IMAGE_ASPECT_COLOR_BIT,
+                               VK_IMAGE_LAYOUT_GENERAL,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                               VK_PIPELINE_STAGE_TRANSFER_BIT,
+                               VK_PIPELINE_STAGE_TRANSFER_BIT);
+                setImageLayout(bufferPair.computeCommandBuffer,
+                               outputTexture.image,
+                               VK_IMAGE_ASPECT_COLOR_BIT,
+                               VK_IMAGE_LAYOUT_UNDEFINED,
+                               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                               VK_PIPELINE_STAGE_TRANSFER_BIT,
+                               VK_PIPELINE_STAGE_TRANSFER_BIT);
+                VkImageCopy imageCopyRegion{};
+                imageCopyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                imageCopyRegion.srcSubresource.layerCount = 1;
+                imageCopyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                imageCopyRegion.dstSubresource.layerCount = 1;
+                imageCopyRegion.extent.width = inputTexture.width;
+                imageCopyRegion.extent.height = inputTexture.height;
+                imageCopyRegion.extent.depth = 1;
+
+                // Issue the copy command
+                vkCmdCopyImage(
+                        bufferPair.computeCommandBuffer,
+                        outputTexture.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        tempTexture.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        1,
+                        &imageCopyRegion);
+
+                vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                  compute.at(2).pipeline);
+                vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                        compute.at(2).pipelineLayout,
+                                        0, 1, &compute.at(2).descriptorSet, 0,
+                                        nullptr);
+                vkCmdPushConstants(bufferPair.computeCommandBuffer, compute.at(2).pipelineLayout,
+                                   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(computePushConstant), &computePushConstant);
+                vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
+            }
+
             if (RADIANCE_ENABLED) {
                 // Wait
                 vkCmdPipelineBarrier(bufferPair.computeCommandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                                      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 0, nullptr);
 
-                // Fourth ComputeShader call -> calculate radiance
+                // Fifth ComputeShader call -> calculate radiance
                 {
                     setImageLayout(bufferPair.computeCommandBuffer,
                                    tempTexture.image,
@@ -741,13 +817,13 @@ void VulkanEngineEntryPoint::render() {
                             &imageCopyRegion);
 
                     vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                      compute.at(2).pipeline);
+                                      compute.at(3).pipeline);
                     vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                            compute.at(2).pipelineLayout,
-                                            0, 1, &compute.at(2).descriptorSet, 0,
+                                            compute.at(3).pipelineLayout,
+                                            0, 1, &compute.at(3).descriptorSet, 0,
                                             nullptr);
 
-                    vkCmdPushConstants(bufferPair.computeCommandBuffer, compute.at(2).pipelineLayout,
+                    vkCmdPushConstants(bufferPair.computeCommandBuffer, compute.at(3).pipelineLayout,
                                        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(computePushConstant),
                                        &computePushConstant);
                     vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
@@ -895,23 +971,23 @@ void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
                                computeWriteDescriptorSets.data(), 0, nullptr);
     }
 
-    // Radiance calculation
+    // Guided filter
     {
-        VkWriteDescriptorSet inputImageDescriptorSet{};
-        inputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        inputImageDescriptorSet.dstSet = compute.at(2).descriptorSet;
-        inputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        inputImageDescriptorSet.dstBinding = 0;
-        inputImageDescriptorSet.pImageInfo = &inputTexture.descriptor;
-        inputImageDescriptorSet.descriptorCount = 1;
+        VkWriteDescriptorSet guideImageDescriptorSet{};
+        guideImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        guideImageDescriptorSet.dstSet = compute.at(2).descriptorSet;
+        guideImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        guideImageDescriptorSet.dstBinding = 0;
+        guideImageDescriptorSet.pImageInfo = &inputTexture.descriptor;
+        guideImageDescriptorSet.descriptorCount = 1;
 
-        VkWriteDescriptorSet transmissionImageDescriptorSet{};
-        transmissionImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        transmissionImageDescriptorSet.dstSet = compute.at(2).descriptorSet;
-        transmissionImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        transmissionImageDescriptorSet.dstBinding = 1;
-        transmissionImageDescriptorSet.pImageInfo = &tempTexture.descriptor;
-        transmissionImageDescriptorSet.descriptorCount = 1;
+        VkWriteDescriptorSet filterInputImageDescriptorSet{};
+        filterInputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        filterInputImageDescriptorSet.dstSet = compute.at(2).descriptorSet;
+        filterInputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        filterInputImageDescriptorSet.dstBinding = 1;
+        filterInputImageDescriptorSet.pImageInfo = &tempTexture.descriptor;
+        filterInputImageDescriptorSet.descriptorCount = 1;
 
         VkWriteDescriptorSet outputImageDescriptorSet{};
         outputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -921,9 +997,44 @@ void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
         outputImageDescriptorSet.pImageInfo = &outputTexture.descriptor;
         outputImageDescriptorSet.descriptorCount = 1;
 
+        std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets = {
+                guideImageDescriptorSet,
+                filterInputImageDescriptorSet,
+                outputImageDescriptorSet,
+        };
+        vkUpdateDescriptorSets(engineDevice.getDevice(), computeWriteDescriptorSets.size(),
+                               computeWriteDescriptorSets.data(), 0, nullptr);
+    }
+
+    // Radiance calculation
+    {
+        VkWriteDescriptorSet inputImageDescriptorSet{};
+        inputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        inputImageDescriptorSet.dstSet = compute.at(3).descriptorSet;
+        inputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        inputImageDescriptorSet.dstBinding = 0;
+        inputImageDescriptorSet.pImageInfo = &inputTexture.descriptor;
+        inputImageDescriptorSet.descriptorCount = 1;
+
+        VkWriteDescriptorSet transmissionImageDescriptorSet{};
+        transmissionImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        transmissionImageDescriptorSet.dstSet = compute.at(3).descriptorSet;
+        transmissionImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        transmissionImageDescriptorSet.dstBinding = 1;
+        transmissionImageDescriptorSet.pImageInfo = &tempTexture.descriptor;
+        transmissionImageDescriptorSet.descriptorCount = 1;
+
+        VkWriteDescriptorSet outputImageDescriptorSet{};
+        outputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        outputImageDescriptorSet.dstSet = compute.at(3).descriptorSet;
+        outputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        outputImageDescriptorSet.dstBinding = 2;
+        outputImageDescriptorSet.pImageInfo = &outputTexture.descriptor;
+        outputImageDescriptorSet.descriptorCount = 1;
+
         VkWriteDescriptorSet maxAirLightBufferDescriptorSet{};
         maxAirLightBufferDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        maxAirLightBufferDescriptorSet.dstSet = compute.at(2).descriptorSet;
+        maxAirLightBufferDescriptorSet.dstSet = compute.at(3).descriptorSet;
         maxAirLightBufferDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         maxAirLightBufferDescriptorSet.dstBinding = 3;
         maxAirLightBufferDescriptorSet.pBufferInfo = &airLightMaxBuffer->getBufferInfo();

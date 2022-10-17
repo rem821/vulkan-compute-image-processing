@@ -8,7 +8,7 @@
 //  1 --> Work PC (AMD Radeon card)
 //  2 --> Macbook Pro  16" 2019 (AMD Radeon card)
 
-#define DEVICE_TYPE 0
+#define DEVICE_TYPE 1
 
 #if DEVICE_TYPE == 0
 
@@ -34,6 +34,7 @@
 #define RADIANCE_ENABLED true
 #define TRANSMISSION_SHADER "ImageTransmission"
 #define MAXIMUM_AIRLIGHT_SHADER "MaximumAirLight"
+#define GUIDED_FILTER_SHADER "GuidedFilter"
 #define RADIANCE_SHADER "ImageRadiance"
 #define WORKGROUP_COUNT 64
 
@@ -58,9 +59,10 @@
 #define SWEEP_FRAMES 20
 
 // Shaders section
-#define RADIANCE_ENABLED true
+#define RADIANCE_ENABLED false
 #define TRANSMISSION_SHADER "ImageTransmission"
 #define MAXIMUM_AIRLIGHT_SHADER "MaximumAirLight"
+#define GUIDED_FILTER_SHADER "GuidedFilter"
 #define RADIANCE_SHADER "ImageRadiance"
 #define WORKGROUP_COUNT 16
 
@@ -88,6 +90,7 @@
 #define RADIANCE_ENABLED true
 #define TRANSMISSION_SHADER "ImageTransmission"
 #define MAXIMUM_AIRLIGHT_SHADER "MaximumAirLight"
+#define GUIDED_FILTER_SHADER "GuidedFilter"
 #define RADIANCE_SHADER "ImageRadiance"
 #define WORKGROUP_COUNT 16
 

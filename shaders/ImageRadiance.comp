@@ -23,7 +23,5 @@ void main()
 
     vec3 radiance = ((I - A) / t) + A;
 
-    //imageStore(resultImage, ivec2(gl_GlobalInvocationID.xy), res);
     imageStore(resultImage, ivec2(gl_GlobalInvocationID.xy), vec4(radiance, 1.0f));
-
 }

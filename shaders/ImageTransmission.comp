@@ -18,7 +18,7 @@ layout (push_constant) uniform constants {
     float omega;
 } PushConstants;
 
-const int kernelSize = 32;
+const int kernelSize = 31;
 
 struct ImageData
 {
@@ -45,9 +45,9 @@ void main()
 
     // Fetch neighbouring texels
     int n = 0;
-    for (int i = -kernelSize / 2; i <= kernelSize / 2; ++i)
+    for (int i = -kernelSize / 2; i <= (kernelSize / 2) + 1; ++i)
     {
-        for (int j = -kernelSize / 2; j <= kernelSize / 2; ++j)
+        for (int j = -kernelSize / 2; j <= (kernelSize / 2) + 1; ++j)
         {
             vec3 rgb = imageLoad(inputImage, ivec2(gl_GlobalInvocationID.x + i, gl_GlobalInvocationID.y + j)).rgb;
 
