@@ -20,7 +20,7 @@
 #define VALIDATION_LAYER_NAME "VK_LAYER_LUNARG_standard_validation"
 
 // Content section
-#define VIDEO_DOWNSCALE_FACTOR 4
+#define VIDEO_DOWNSCALE_FACTOR 2
 #define VIDEO_PATH "/home/standa/3_1_1_1/camera_left_front/video.mp4"
 #define IMAGE_PATH "../assets/image4.jpg"
 #define PLAY_VIDEO true
