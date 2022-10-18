@@ -809,7 +809,7 @@ void VulkanEngineEntryPoint::render() {
             vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
             vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
 
-            // Middle Right (final image)
+            // Bottom Right (final image)
             vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                     graphics.pipelineLayout, 0, 1,
                                     &graphics.descriptorSetPostComputeFinal, 0, nullptr);
