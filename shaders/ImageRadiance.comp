@@ -20,8 +20,9 @@ void main()
     vec3 I = imageLoad(inputImage, ivec2(gl_GlobalInvocationID.xy)).rgb;
     vec3 A = vec3(airLightMaxData.channels[0], airLightMaxData.channels[1], airLightMaxData.channels[2]);
     float t = imageLoad(transmissionImage, ivec2(gl_GlobalInvocationID.xy)).r;
-    float t0 = max(t, 0.3);
-    vec3 radiance = ((I - A) / t0) + A;
+    float t0 = max(t, 0.1);
+    vec3 radiance = (I - (A * (1 - t0))) / t0;
 
-    imageStore(resultImage, ivec2(gl_GlobalInvocationID.xy), vec4(1.0f, 0.0f, 0.0f, 1.0f));
+
+    imageStore(resultImage, ivec2(gl_GlobalInvocationID.xy), vec4(radiance, 1.0f));
 }

@@ -688,7 +688,7 @@ void VulkanEngineEntryPoint::render() {
             // Third ComputeShader call -> calculate transmission
             {
                 moveTempTextureTo(bufferPair, darkChannelPriorTexture);
-                computePushConstant.omega = 0.95;
+                computePushConstant.omega = 0.98;
                 vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
                                   compute.at(0).pipeline);
                 vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
