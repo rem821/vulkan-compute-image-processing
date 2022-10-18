@@ -43,7 +43,12 @@ public:
     struct {
         VkDescriptorSetLayout descriptorSetLayout;
         VkDescriptorSet descriptorSetPreCompute;
-        VkDescriptorSet descriptorSetPostCompute;
+        VkDescriptorSet descriptorSetPostComputeStageOne;
+        VkDescriptorSet descriptorSetPostComputeStageTwo;
+        VkDescriptorSet descriptorSetPostComputeStageThree;
+        VkDescriptorSet descriptorSetPostComputeStageFour;
+        VkDescriptorSet descriptorSetPostComputeFinal;
+
         VkPipeline pipeline;
         VkPipelineLayout pipelineLayout;
     } graphics;
@@ -87,7 +92,7 @@ private:
 
     void prepareComputePipeline(std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings, const std::string& shaderName);
 
-    void moveOutputTextureToTemp(CommandBufferPair bufferPair);
+    void moveTempTextureTo(CommandBufferPair bufferPair, Texture2D destTexture);
 
     VulkanEngineWindow window{WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE};
     VulkanEngineDevice engineDevice{window, WINDOW_TITLE};
@@ -99,8 +104,11 @@ private:
     double totalFrames = video.get(cv::CAP_PROP_FRAME_COUNT);
 
     Texture2D inputTexture;
-    Texture2D tempTexture;
-    Texture2D outputTexture;
+    Texture2D temporaryTexture;
+    Texture2D darkChannelPriorTexture;
+    Texture2D transmissionTexture;
+    Texture2D filteredTransmissionTexture;
+    Texture2D radianceTexture;
 
     std::unique_ptr<VulkanEngineBuffer> vertexBuffer;
     std::unique_ptr<VulkanEngineBuffer> indexBuffer;
@@ -117,6 +125,10 @@ private:
     VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
 
     uint32_t indexCount;
+
+    glm::vec2 mouseDragOrigin;
+    float zoom = 0.0f;
+    glm::vec2 panPosition = glm::vec2(0.0f, 0.0f);
 };
 
 

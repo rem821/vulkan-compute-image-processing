@@ -110,7 +110,7 @@ void main()
     float cov_I_p_b = conv(meanKernel, elemMult(I.blue, p)) - (mean_I.b * mean_p);
 
     vec3 cov_I_p = vec3(cov_I_p_r, cov_I_p_g, cov_I_p_b);
-    vec3 a = cov_I_p * inverse(var_I);
+    vec3 a = cov_I_p * var_I;
     float b = mean_p - (a.r * mean_I.r + a.g * mean_I.g + a.b + mean_I.b);
 
     vec3 I_pix = vec3(I.red[kernelElements / 2], I.green[kernelElements / 2], I.blue[kernelElements / 2]);

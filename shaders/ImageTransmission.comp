@@ -5,12 +5,11 @@
 layout (local_size_x = GROUP_SIZE, local_size_y = GROUP_SIZE) in;
 
 layout (binding = 0, rgba8) uniform readonly image2D inputImage;
-layout (binding = 1, rgba8) uniform readonly image2D darkChannelImage;
-layout (binding = 2, rgba8) uniform image2D resultImage;
-layout (binding = 3) buffer AirLightBuffer {
+layout (binding = 1, rgba8) uniform image2D resultImage;
+layout (binding = 2) buffer AirLightBuffer {
     float groups[][3];
 } airLightGroupsData;
-layout (binding = 4) buffer AirLightMaxBuffer {
+layout (binding = 3) buffer AirLightMaxBuffer {
     float channels[3];
 } airLightMaxData;
 layout (push_constant) uniform constants {
@@ -18,7 +17,7 @@ layout (push_constant) uniform constants {
     float omega;
 } PushConstants;
 
-const int kernelSize = 9;
+const int kernelSize = 15;
 
 struct ImageData
 {
@@ -94,8 +93,6 @@ void main()
     if (!(gl_LocalInvocationID.x == 0 && gl_LocalInvocationID.y == 0)) {
         return;
     }
-
-
 
     float[3] brightestPixel = { 0.0f, 0.0f, 0.0f };
     for (int z = 0; z < 3; ++z) {

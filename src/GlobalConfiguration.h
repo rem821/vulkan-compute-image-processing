@@ -31,8 +31,6 @@
 #define SWEEP_FRAMES 20
 
 // Shaders section
-#define GUIDED_FILTER_ENABLED true
-#define RADIANCE_ENABLED false
 #define TRANSMISSION_SHADER "ImageTransmission"
 #define MAXIMUM_AIRLIGHT_SHADER "MaximumAirLight"
 #define GUIDED_FILTER_SHADER "GuidedFilter"
@@ -60,8 +58,6 @@
 #define SWEEP_FRAMES 20
 
 // Shaders section
-#define GUIDED_FILTER_ENABLED false
-#define RADIANCE_ENABLED false
 #define TRANSMISSION_SHADER "ImageTransmission"
 #define MAXIMUM_AIRLIGHT_SHADER "MaximumAirLight"
 #define GUIDED_FILTER_SHADER "GuidedFilter"
@@ -89,8 +85,6 @@
 #define SWEEP_FRAMES 20
 
 // Shaders section
-#define GUIDED_FILTER_ENABLED false
-#define RADIANCE_ENABLED true
 #define TRANSMISSION_SHADER "ImageTransmission"
 #define MAXIMUM_AIRLIGHT_SHADER "MaximumAirLight"
 #define GUIDED_FILTER_SHADER "GuidedFilter"
