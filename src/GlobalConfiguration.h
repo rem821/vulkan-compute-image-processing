@@ -8,12 +8,12 @@
 //  1 --> Work PC (AMD Radeon card)
 //  2 --> Macbook Pro  16" 2019 (AMD Radeon card)
 
-#define DEVICE_TYPE 1
+#define DEVICE_TYPE 0
 
 #if DEVICE_TYPE == 0
 
 // Graphics setting section
-#define INTEGRATED_GRAPHICS false
+#define INTEGRATED_GRAPHICS true
 #define VALIDATION_LAYER_NAME "VK_LAYER_LUNARG_standard_validation"
 
 // Content section
@@ -71,6 +71,6 @@
 #define RADIANCE_SHADER "ImageRadiance"
 
 // Debugging section
-#define TIMER_ON false
+#define TIMER_ON true
 #define RENDERDOC_ENABLED true
 

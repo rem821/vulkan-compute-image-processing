@@ -6,7 +6,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
 #include "VulkanEngineEntryPoint.h"
-
+#include "profiling/Timer.h"
 #include "../external/stb/stb_image.h"
 #include "../external/stb/stb_image_resize.h"
 #include "../external/stb/stb_image_write.h"
@@ -57,17 +57,21 @@ VulkanEngineEntryPoint::VulkanEngineEntryPoint() {
 }
 
 void VulkanEngineEntryPoint::prepareInputImage() {
+
     if (PLAY_VIDEO && frameIndex < totalFrames) {
+        //if(frameIndex > 5) { return; }
         if (inputTexture.image != nullptr) {
             inputTexture.destroy(engineDevice);
         }
 
         cv::Mat frame;
-        while (lastReadFrame < frameIndex) {
-            video.read(frame);
-            lastReadFrame += 1;
+        {
+            Timer timer("Image loading");
+            while (lastReadFrame < frameIndex) {
+                video.read(frame);
+                lastReadFrame += 1;
+            }
         }
-
         int32_t width = frame.cols;
         int32_t height = frame.rows;
 
@@ -94,11 +98,13 @@ void VulkanEngineEntryPoint::prepareInputImage() {
         inputTexture.fromImageFile(d_pixels_rgba, d_size_rgba, VK_FORMAT_R8G8B8A8_UNORM, d_width, d_height,
                                    engineDevice,
                                    engineDevice.graphicsQueue(), VK_FILTER_LINEAR,
-                                   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_LAYOUT_GENERAL);
+                                   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+                                   VK_IMAGE_LAYOUT_GENERAL);
 
         delete[] d_pixels;
         delete[] d_pixels_rgba;
     } else {
+        if (inputTexture.width != 0) return;
         size_t size;
         int32_t width, height, channels;
         loadImageFromFile(IMAGE_PATH, nullptr, size, width, height, channels);
@@ -108,10 +114,12 @@ void VulkanEngineEntryPoint::prepareInputImage() {
 
         inputTexture.fromImageFile(pixels, size, VK_FORMAT_R8G8B8A8_UNORM, width, height, engineDevice,
                                    engineDevice.graphicsQueue(), VK_FILTER_LINEAR,
-                                   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_LAYOUT_GENERAL);
+                                   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+                                   VK_IMAGE_LAYOUT_GENERAL);
 
         delete[] pixels;
     }
+
 }
 
 bool VulkanEngineEntryPoint::loadImageFromFile(const std::string &file, void *pixels, size_t &size, int &width,
@@ -375,7 +383,7 @@ void VulkanEngineEntryPoint::setupDescriptorPool() {
     descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     descriptorPoolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     descriptorPoolInfo.pPoolSizes = poolSizes.data();
-    descriptorPoolInfo.maxSets = 10;
+    descriptorPoolInfo.maxSets = 50;
 
     if (vkCreateDescriptorPool(engineDevice.getDevice(), &descriptorPoolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create descriptor pool!");
