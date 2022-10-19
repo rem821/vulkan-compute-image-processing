@@ -688,7 +688,7 @@ void VulkanEngineEntryPoint::render() {
             // Third ComputeShader call -> calculate transmission
             {
                 moveTempTextureTo(bufferPair, darkChannelPriorTexture);
-                computePushConstant.omega = 0.98;
+                computePushConstant.omega = 0.95;
                 vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
                                   compute.at(0).pipeline);
                 vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -766,20 +766,20 @@ void VulkanEngineEntryPoint::render() {
 
             vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
 
-            // Top Right (compute first stage)
+            // Top Right (final image)
             vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                     graphics.pipelineLayout, 0, 1,
-                                    &graphics.descriptorSetPostComputeStageOne, 0, nullptr);
+                                    &graphics.descriptorSetPostComputeFinal, 0, nullptr);
             vkCmdBindPipeline(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
 
             viewport.x = panPosition.x + preWidth;
             vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
             vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
 
-            // Middle Left (compute second stage)
+            // Middle Left (compute first stage)
             vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                     graphics.pipelineLayout, 0, 1,
-                                    &graphics.descriptorSetPostComputeStageTwo, 0, nullptr);
+                                    &graphics.descriptorSetPostComputeStageOne, 0, nullptr);
             vkCmdBindPipeline(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
 
             viewport.x = panPosition.x;
@@ -787,10 +787,10 @@ void VulkanEngineEntryPoint::render() {
             vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
             vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
 
-            // Middle Right (compute third stage)
+            // Middle Right (compute second stage)
             vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                     graphics.pipelineLayout, 0, 1,
-                                    &graphics.descriptorSetPostComputeStageThree, 0, nullptr);
+                                    &graphics.descriptorSetPostComputeStageTwo, 0, nullptr);
             vkCmdBindPipeline(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
 
             viewport.x = panPosition.x + preWidth;
@@ -798,10 +798,10 @@ void VulkanEngineEntryPoint::render() {
             vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
             vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
 
-            // Bottom Left (compute fourth stage)
+            // Bottom Left (compute third stage)
             vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                     graphics.pipelineLayout, 0, 1,
-                                    &graphics.descriptorSetPostComputeStageFour, 0, nullptr);
+                                    &graphics.descriptorSetPostComputeStageThree, 0, nullptr);
             vkCmdBindPipeline(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
 
             viewport.x = panPosition.x;
@@ -809,10 +809,10 @@ void VulkanEngineEntryPoint::render() {
             vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
             vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
 
-            // Bottom Right (final image)
+            // Bottom Right (final fourth stage)
             vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                     graphics.pipelineLayout, 0, 1,
-                                    &graphics.descriptorSetPostComputeFinal, 0, nullptr);
+                                    &graphics.descriptorSetPostComputeStageFour, 0, nullptr);
             vkCmdBindPipeline(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
 
             viewport.x = panPosition.x + preWidth;

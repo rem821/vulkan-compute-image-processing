@@ -8,7 +8,7 @@
 //  1 --> Work PC (AMD Radeon card)
 //  2 --> Macbook Pro  16" 2019 (AMD Radeon card)
 
-#define DEVICE_TYPE 0
+#define DEVICE_TYPE 1
 
 #if DEVICE_TYPE == 0
 
@@ -31,12 +31,13 @@
 #define VALIDATION_LAYER_NAME "VK_LAYER_LUNARG_standard_validation"
 
 // Content section
-#define VIDEO_DOWNSCALE_FACTOR 4
-#define VIDEO_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_1/camera_left_front/video.mp4"
+#define VIDEO_DOWNSCALE_FACTOR 3
+#define VIDEO_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_2/camera_left_front/video.mp4"
+//#define VIDEO_PATH "../assets/foggy_ride.mp4"
 #define IMAGE_PATH "../assets/image.jpg"
 
 // Shaders section
-#define WORKGROUP_COUNT 16
+#define WORKGROUP_COUNT 24
 
 #elif DEVICE_TYPE == 2
 
@@ -59,7 +60,7 @@
 #define WINDOW_WIDTH 1920
 #define WINDOW_HEIGHT 1080
 
-#define PLAY_VIDEO false
+#define PLAY_VIDEO true
 
 #define SWEEP_FRAMES 40
 

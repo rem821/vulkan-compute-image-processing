@@ -15,22 +15,21 @@ layout (push_constant) uniform constants {
 const int kernelSize = 3;
 const int kernelElements = kernelSize * kernelSize;
 
-const float eps = 0.1;
+const float eps = 0.00001;
 
 struct RGBData
 {
     float red[kernelElements];
     float green[kernelElements];
     float blue[kernelElements];
-} I;
-float p[kernelElements];
+};
 
-float conv(in float[kernelElements] kernel, in float[kernelElements] data)
+float boxfilter(in float[kernelElements] data)
 {
-    float res = 0.0;
+    float res;
     for (int i = 0; i < kernelElements; ++i)
     {
-        res += kernel[i] * data[i];
+        res += data[i];
     }
     return res / kernelElements;
 }
@@ -78,46 +77,51 @@ float[kernelElements] elemMult(in float[kernelElements] x, in float[kernelElemen
 void main()
 {
     // Fetch neighbouring texels
-    I = guideImageLoadPatch();
-    p = filterInputLoadPatch();
+    RGBData I = guideImageLoadPatch();
+    float p[kernelElements] = filterInputLoadPatch();
 
-    float[kernelElements] meanKernel;
-    for (int i = 0; i < kernelElements; i++) {
-        meanKernel[i] = 1.0;
-    }
 
-    vec3 mean_I = vec3(0.0, 0.0, 0.0);
-    mean_I.r = conv(meanKernel, I.red);
-    mean_I.g = conv(meanKernel, I.green);
-    mean_I.b = conv(meanKernel, I.blue);
+    vec3 mean_I = vec3(0.0);
+    mean_I.r = boxfilter(I.red);
+    mean_I.g = boxfilter(I.green);
+    mean_I.b = boxfilter(I.blue);
 
-    float mean_p = conv(meanKernel, p);
+    vec3 mean_I_p = vec3(0.0);
+    mean_I_p.r = boxfilter(elemMult(I.red, p)) / kernelElements;
+    mean_I_p.g = boxfilter(elemMult(I.green, p)) / kernelElements;
+    mean_I_p.b = boxfilter(elemMult(I.blue, p)) / kernelElements;
 
-    float var_I_rr = conv(meanKernel, elemMult(I.red, I.red)) - mean_I.r * mean_I.r + eps;
-    float var_I_rg = conv(meanKernel, elemMult(I.red, I.green)) - mean_I.r * mean_I.g;
-    float var_I_rb = conv(meanKernel, elemMult(I.red, I.blue)) - mean_I.r * mean_I.b;
-    float var_I_gg = conv(meanKernel, elemMult(I.green, I.green)) - mean_I.g * mean_I.g + eps;
-    float var_I_gb = conv(meanKernel, elemMult(I.green, I.blue)) - mean_I.g * mean_I.b;
-    float var_I_bb = conv(meanKernel, elemMult(I.blue, I.blue)) - mean_I.b * mean_I.b + eps;
+    float mean_p = boxfilter(p);
+
+    float var_I_rr = boxfilter(elemMult(I.red, I.red)) - mean_I.r * mean_I.r + eps;
+    float var_I_rg = boxfilter(elemMult(I.red, I.green)) - mean_I.r * mean_I.g;
+    float var_I_rb = boxfilter(elemMult(I.red, I.blue)) - mean_I.r * mean_I.b;
+    float var_I_gg = boxfilter(elemMult(I.green, I.green)) - mean_I.g * mean_I.g + eps;
+    float var_I_gb = boxfilter(elemMult(I.green, I.blue)) - mean_I.g * mean_I.b;
+    float var_I_bb = boxfilter(elemMult(I.blue, I.blue)) - mean_I.b * mean_I.b + eps;
 
     mat3 var_I;
     var_I[0] = vec3(var_I_rr, var_I_rg, var_I_rb);
     var_I[1] = vec3(var_I_rg, var_I_gg, var_I_gb);
     var_I[2] = vec3(var_I_rb, var_I_gb, var_I_bb);
 
-    float cov_I_p_r = conv(meanKernel, elemMult(I.red, p)) - (mean_I.r * mean_p);
-    float cov_I_p_g = conv(meanKernel, elemMult(I.green, p)) - (mean_I.g * mean_p);
-    float cov_I_p_b = conv(meanKernel, elemMult(I.blue, p)) - (mean_I.b * mean_p);
+    vec3 cov_I_p = vec3(0.0);
+    cov_I_p.r = mean_I_p.r - (mean_I.r * mean_p);
+    cov_I_p.g = mean_I_p.g - (mean_I.g * mean_p);
+    cov_I_p.b = mean_I_p.b - (mean_I.b * mean_p);
 
-    vec3 cov_I_p = vec3(cov_I_p_r, cov_I_p_g, cov_I_p_b);
-    vec3 a = cov_I_p * var_I;
+    mat3 var_I_inv = inverse(var_I);
+
+    vec3 a = vec3(0);
+    a.r = cov_I_p.r * var_I_rr + cov_I_p.g + var_I_rg + cov_I_p.b + var_I_rb;
+    a.g = cov_I_p.r * var_I_rg + cov_I_p.g + var_I_gg + cov_I_p.b + var_I_gb;
+    a.b = cov_I_p.r * var_I_rb + cov_I_p.g + var_I_gb + cov_I_p.b + var_I_bb;
+
     float b = mean_p - (a.r * mean_I.r + a.g * mean_I.g + a.b + mean_I.b);
 
     vec3 I_pix = vec3(I.red[kernelElements / 2], I.green[kernelElements / 2], I.blue[kernelElements / 2]);
     float q = (a.r * I_pix.r + a.g * I_pix.g + a.b * I_pix.b) + b;
 
-    //vec4 res = vec4(b, b, b,  1.0);
     vec4 res = vec4(q, q, q, 1.0);
-    //imageStore(resultImage, ivec2(gl_GlobalInvocationID.xy), vec4(1.0, 0.0, 1.0, 1.0));
     imageStore(resultImage, ivec2(gl_GlobalInvocationID.xy), res);
 }
