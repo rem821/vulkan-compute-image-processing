@@ -14,10 +14,14 @@ layout (binding = 3) buffer AirLightMaxBuffer {
 } airLightMaxData;
 layout (push_constant) uniform constants {
     int groupCount;
+    int imageWidth;
+    int imageHeight;
     float omega;
+    float epsilon;
+
 } PushConstants;
 
-const int kernelSize = 15;
+const int kernelSize = 9;
 
 struct ImageData
 {
@@ -44,11 +48,16 @@ void main()
 
     // Fetch neighbouring texels
     int n = 0;
-    for (int i = -kernelSize / 2; i <= (kernelSize / 2) + 1; ++i)
+    for (int i = -kernelSize / 2; i <= kernelSize / 2; ++i)
     {
-        for (int j = -kernelSize / 2; j <= (kernelSize / 2) + 1; ++j)
+        for (int j = -kernelSize / 2; j <= kernelSize / 2; ++j)
         {
-            vec3 rgb = imageLoad(inputImage, ivec2(gl_GlobalInvocationID.x + i, gl_GlobalInvocationID.y + j)).rgb;
+            float pix_x = gl_GlobalInvocationID.x + i;
+            float pix_y = gl_GlobalInvocationID.y + j;
+            vec3 rgb = vec3(1);
+            if(pix_x < PushConstants.imageWidth && pix_x >= 0 && pix_y < PushConstants.imageHeight && pix_y > 0) {
+                rgb = imageLoad(inputImage, ivec2(pix_x, pix_y)).rgb;
+            }
 
             float red = rgb.r * airRed;
             float green = rgb.g * airGreen;

@@ -9,7 +9,10 @@ layout (binding = 1, rgba8) uniform readonly image2D filterInputImage;
 layout (binding = 2, rgba8) uniform image2D resultImage;
 layout (push_constant) uniform constants {
     int groupCount;
+    int imageWidth;
+    int imageHeight;
     float omega;
+    float epsilon;
 } PushConstants;
 
 const int kernelSize = 3;
@@ -37,9 +40,9 @@ float boxfilter(in float[kernelElements] data)
 RGBData guideImageLoadPatch() {
     RGBData result;
     int n = 0;
-    for (int i = -kernelSize / 2; i <= (kernelSize / 2) + 1; ++i)
+    for (int i = -kernelSize / 2; i <= kernelSize / 2; ++i)
     {
-        for (int j = -kernelSize / 2; j <= (kernelSize / 2) + 1; ++j)
+        for (int j = -kernelSize / 2; j <= kernelSize / 2; ++j)
         {
             vec3 rgb = imageLoad(guideImage, ivec2(gl_GlobalInvocationID.x + i, gl_GlobalInvocationID.y + j)).rgb;
 
@@ -55,9 +58,9 @@ RGBData guideImageLoadPatch() {
 float[kernelElements] filterInputLoadPatch() {
     float[kernelElements] result;
     int n = 0;
-    for (int i = -kernelSize / 2; i <= (kernelSize / 2) + 1; ++i)
+    for (int i = -kernelSize / 2; i <= kernelSize / 2; ++i)
     {
-        for (int j = -kernelSize / 2; j <= (kernelSize / 2) + 1; ++j)
+        for (int j = -kernelSize / 2; j <= kernelSize / 2; ++j)
         {
             result[n] = imageLoad(filterInputImage, ivec2(gl_GlobalInvocationID.x + i, gl_GlobalInvocationID.y + j)).r;
             n++;

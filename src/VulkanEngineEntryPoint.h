@@ -37,7 +37,10 @@ public:
 
     struct {
         glm::int32_t groupCount;
+        glm::int32_t imageWidth;
+        glm::int32_t imageHeight;
         glm::float32_t omega;
+        glm::float32_t epsilon;
     } computePushConstant;
 
     struct {

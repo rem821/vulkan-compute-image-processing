@@ -651,7 +651,11 @@ void VulkanEngineEntryPoint::render() {
             // First ComputeShader call -> calculate DarkChannelPrior + maxAirLight channels for each workgroup
             {
                 computePushConstant.groupCount = WORKGROUP_COUNT * WORKGROUP_COUNT;
+                computePushConstant.imageWidth = glm::int32_t(inputTexture.width);
+                computePushConstant.imageHeight = glm::int32_t(inputTexture.height);
                 computePushConstant.omega = -1.0;
+                computePushConstant.epsilon = 0.000001;
+
                 vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
                                   compute.at(0).pipeline);
                 vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,

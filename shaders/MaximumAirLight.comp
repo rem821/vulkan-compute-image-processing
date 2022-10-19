@@ -8,7 +8,10 @@ layout (binding = 1) buffer AirLightMaxBuffer {
 } airLightMaxData;
 layout (push_constant) uniform constants {
     int groupCount;
+    int imageWidth;
+    int imageHeight;
     float omega;
+    float epsilon;
 } PushConstants;
 
 void main()
