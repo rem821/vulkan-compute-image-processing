@@ -37,7 +37,7 @@
 #define IMAGE_PATH "../assets/image.jpg"
 
 // Shaders section
-#define WORKGROUP_COUNT 24
+#define WORKGROUP_COUNT 32
 
 #elif DEVICE_TYPE == 2
 
@@ -64,6 +64,7 @@
 
 #define SWEEP_FRAMES 40
 
+#define DARK_CHANNEL_PRIOR_SHADER "ImageDarkChannelPrior"
 #define TRANSMISSION_SHADER "ImageTransmission"
 #define MAXIMUM_AIRLIGHT_SHADER "MaximumAirLight"
 #define GUIDED_FILTER_SHADER "GuidedFilter"

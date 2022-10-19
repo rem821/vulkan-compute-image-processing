@@ -95,8 +95,6 @@ private:
 
     void prepareComputePipeline(std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings, const std::string& shaderName);
 
-    void moveTempTextureTo(CommandBufferPair bufferPair, Texture2D destTexture);
-
     VulkanEngineWindow window{WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE};
     VulkanEngineDevice engineDevice{window, WINDOW_TITLE};
     VulkanEngineRenderer renderer{window, engineDevice};
@@ -107,7 +105,6 @@ private:
     double totalFrames = video.get(cv::CAP_PROP_FRAME_COUNT);
 
     Texture2D inputTexture;
-    Texture2D temporaryTexture;
     Texture2D darkChannelPriorTexture;
     Texture2D transmissionTexture;
     Texture2D filteredTransmissionTexture;
