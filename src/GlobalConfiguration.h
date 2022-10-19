@@ -27,7 +27,7 @@
 #elif DEVICE_TYPE == 1
 
 // Graphics setting section
-#define INTEGRATED_GRAPHICS true
+#define INTEGRATED_GRAPHICS false
 #define VALIDATION_LAYER_NAME "VK_LAYER_LUNARG_standard_validation"
 
 // Content section
@@ -71,5 +71,5 @@
 
 // Debugging section
 #define TIMER_ON false
-#define RENDERDOC_ENABLED false
+#define RENDERDOC_ENABLED true
 
