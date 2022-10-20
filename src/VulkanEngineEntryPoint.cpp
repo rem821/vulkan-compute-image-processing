@@ -55,7 +55,7 @@ VulkanEngineEntryPoint::VulkanEngineEntryPoint() {
 }
 
 void VulkanEngineEntryPoint::prepareInputImage() {
-    //Timer timer("Preparing next video frame");
+    Timer timer("Preparing next video frame");
 
     if (PLAY_VIDEO && frameIndex < totalFrames) {
         cv::Mat frame;
@@ -79,7 +79,6 @@ void VulkanEngineEntryPoint::prepareInputImage() {
 
         // Downscale the video according to VIDEO_DOWNSCALE_FACTOR
         cv::resize(frame, d_frame, cv::Size(d_width, d_height), cv::INTER_LINEAR);
-        //stbir_resize_uint8(frame.data, (width, height, 0, d_pixels, d_width, d_height, 0, d_channels);
 
         // Convert from BGR to RGBA
         size_t currInd = 0;
@@ -99,7 +98,6 @@ void VulkanEngineEntryPoint::prepareInputImage() {
 
         delete[] d_pixels_rgba;
     } else {
-        if (inputTexture.width != 0) return;
         size_t size;
         int32_t width, height, channels;
         loadImageFromFile(IMAGE_PATH, nullptr, size, width, height, channels);
@@ -246,20 +244,16 @@ void VulkanEngineEntryPoint::setupDescriptorSetLayout() {
     descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(setLayoutBindings.size());
 
     VkDescriptorSetLayoutCreateInfo descriptorLayout = descriptorSetLayoutCreateInfo;
-    if (vkCreateDescriptorSetLayout(engineDevice.getDevice(), &descriptorLayout, nullptr,
-                                    &graphics.descriptorSetLayout) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create descriptor set layout!");
-    }
+    VK_CHECK(vkCreateDescriptorSetLayout(engineDevice.getDevice(), &descriptorLayout, nullptr,
+                                         &graphics.descriptorSetLayout));
 
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
     pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutCreateInfo.setLayoutCount = 1;
     pipelineLayoutCreateInfo.pSetLayouts = &graphics.descriptorSetLayout;
 
-    if (vkCreatePipelineLayout(engineDevice.getDevice(), &pipelineLayoutCreateInfo, nullptr,
-                               &graphics.pipelineLayout) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create pipeline layout!");
-    }
+    VK_CHECK(vkCreatePipelineLayout(engineDevice.getDevice(), &pipelineLayoutCreateInfo, nullptr,
+                                    &graphics.pipelineLayout));
 }
 
 void VulkanEngineEntryPoint::prepareGraphicsPipeline() {
@@ -343,10 +337,8 @@ void VulkanEngineEntryPoint::prepareGraphicsPipeline() {
     pipelineCreateInfo.pStages = shaderStages.data();
     pipelineCreateInfo.renderPass = renderer.getSwapChainRenderPass();
 
-    if (vkCreateGraphicsPipelines(engineDevice.getDevice(), VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr,
-                                  &graphics.pipeline) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create graphics pipeline!");
-    }
+    VK_CHECK(vkCreateGraphicsPipelines(engineDevice.getDevice(), VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr,
+                                       &graphics.pipeline));
 }
 
 void VulkanEngineEntryPoint::setupDescriptorPool() {
@@ -379,9 +371,7 @@ void VulkanEngineEntryPoint::setupDescriptorPool() {
     descriptorPoolInfo.pPoolSizes = poolSizes.data();
     descriptorPoolInfo.maxSets = 50;
 
-    if (vkCreateDescriptorPool(engineDevice.getDevice(), &descriptorPoolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create descriptor pool!");
-    }
+    VK_CHECK(vkCreateDescriptorPool(engineDevice.getDevice(), &descriptorPoolInfo, nullptr, &descriptorPool));
 }
 
 void VulkanEngineEntryPoint::setupDescriptorSet() {
@@ -392,40 +382,26 @@ void VulkanEngineEntryPoint::setupDescriptorSet() {
     allocInfo.descriptorSetCount = 1;
 
     // Input image (before compute post-processing)
-    if (vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPreCompute) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate pre-compute descriptor set!");
-    }
+    VK_CHECK(vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPreCompute));
 
     // Image processing stage one
-    if (vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPostComputeStageOne) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate post-compute descriptor set!");
-    }
+    VK_CHECK(
+            vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPostComputeStageOne));
 
     // Image processing stage two
-    if (vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPostComputeStageTwo) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate post-compute descriptor set!");
-    }
+    VK_CHECK(
+            vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPostComputeStageTwo));
 
     // Image processing stage three
-    if (vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPostComputeStageThree) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate post-compute descriptor set!");
-    }
+    VK_CHECK(vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo,
+                                      &graphics.descriptorSetPostComputeStageThree));
 
     // Image processing stage four
-    if (vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPostComputeStageFour) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate post-compute descriptor set!");
-    }
+    VK_CHECK(vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo,
+                                      &graphics.descriptorSetPostComputeStageFour));
 
     // Final image (after compute shader processing)
-    if (vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPostComputeFinal) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate post-compute descriptor set!");
-    }
+    VK_CHECK(vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPostComputeFinal));
 
     updateGraphicsDescriptorSets();
 }
@@ -611,10 +587,8 @@ void VulkanEngineEntryPoint::prepareComputePipeline(std::vector<VkDescriptorSetL
     descriptorLayout.pBindings = setLayoutBindings.data();
     descriptorLayout.bindingCount = static_cast<uint32_t>(setLayoutBindings.size());
 
-    if (vkCreateDescriptorSetLayout(engineDevice.getDevice(), &descriptorLayout, nullptr,
-                                    &compute.at(pipelineIndex).descriptorSetLayout) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create descriptor set layout for compute pipeline!");
-    }
+    VK_CHECK(vkCreateDescriptorSetLayout(engineDevice.getDevice(), &descriptorLayout, nullptr,
+                                         &compute.at(pipelineIndex).descriptorSetLayout));
     VkPushConstantRange pushConstant{};
     pushConstant.offset = 0;
     pushConstant.size = sizeof(computePushConstant);
@@ -627,10 +601,8 @@ void VulkanEngineEntryPoint::prepareComputePipeline(std::vector<VkDescriptorSetL
     pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstant;
     pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 
-    if (vkCreatePipelineLayout(engineDevice.getDevice(), &pipelineLayoutCreateInfo, nullptr,
-                               &compute.at(pipelineIndex).pipelineLayout) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create pipeline layout for compute!");
-    }
+    VK_CHECK(vkCreatePipelineLayout(engineDevice.getDevice(), &pipelineLayoutCreateInfo, nullptr,
+                                    &compute.at(pipelineIndex).pipelineLayout));
 
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -638,10 +610,8 @@ void VulkanEngineEntryPoint::prepareComputePipeline(std::vector<VkDescriptorSetL
     allocInfo.pSetLayouts = &compute.at(pipelineIndex).descriptorSetLayout;
     allocInfo.descriptorSetCount = 1;
 
-    if (vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo,
-                                 &compute.at(pipelineIndex).descriptorSet) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate descriptor sets for compute!");
-    }
+    VK_CHECK(vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo,
+                                      &compute.at(pipelineIndex).descriptorSet));
 
     // Create compute shader pipelines
     VkComputePipelineCreateInfo computePipelineCreateInfo{};
@@ -652,10 +622,8 @@ void VulkanEngineEntryPoint::prepareComputePipeline(std::vector<VkDescriptorSetL
     std::string fileName = "../shaders/" + shaderName + ".comp.spv";
     computePipelineCreateInfo.stage = loadShader(fileName, VK_SHADER_STAGE_COMPUTE_BIT);
     VkPipeline pipeline;
-    if (vkCreateComputePipelines(engineDevice.getDevice(), VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr,
-                                 &pipeline) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create compute pipelines!");
-    }
+    VK_CHECK(vkCreateComputePipelines(engineDevice.getDevice(), VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr,
+                                      &pipeline));
     compute.at(pipelineIndex).pipeline = pipeline;
 }
 
@@ -1234,9 +1202,7 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
     imageCreateCI.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     // Create the image
     VkImage dstImage;
-    if (vkCreateImage(engineDevice.getDevice(), &imageCreateCI, nullptr, &dstImage) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create image for screenshot!");
-    }
+    VK_CHECK(vkCreateImage(engineDevice.getDevice(), &imageCreateCI, nullptr, &dstImage));
 
     // Create memory to back up the image
     VkMemoryRequirements memRequirements;
@@ -1249,13 +1215,9 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
     memAllocInfo.memoryTypeIndex = engineDevice.findMemoryType(memRequirements.memoryTypeBits,
                                                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    if (vkAllocateMemory(engineDevice.getDevice(), &memAllocInfo, nullptr, &dstImageMemory) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate memory for screenshot image!");
-    }
+    VK_CHECK(vkAllocateMemory(engineDevice.getDevice(), &memAllocInfo, nullptr, &dstImageMemory));
 
-    if (vkBindImageMemory(engineDevice.getDevice(), dstImage, dstImageMemory, 0) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to bind memory for screenshot image!");
-    }
+    VK_CHECK(vkBindImageMemory(engineDevice.getDevice(), dstImage, dstImageMemory, 0));
 
     // Do the actual blit from the swapchain image to our host visible destination image
     VkCommandBuffer copyCmd = engineDevice.beginSingleTimeCommands();
@@ -1401,9 +1363,7 @@ VkShaderModule VulkanEngineEntryPoint::loadShaderModule(const char *fileName, Vk
         moduleCreateInfo.codeSize = size;
         moduleCreateInfo.pCode = (uint32_t *) shaderCode;
 
-        if (vkCreateShaderModule(device, &moduleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create shader module!");
-        }
+        VK_CHECK(vkCreateShaderModule(device, &moduleCreateInfo, nullptr, &shaderModule));
 
         delete[] shaderCode;
 

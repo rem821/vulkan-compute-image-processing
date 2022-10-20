@@ -34,18 +34,13 @@ CommandBufferPair VulkanEngineRenderer::beginFrame() {
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-    if (vkBeginCommandBuffer(computeCommandBuffer, &beginInfo) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to begin compute command buffer!");
-    }
+    VK_CHECK(vkBeginCommandBuffer(computeCommandBuffer, &beginInfo));
 
     // Begin graphics command buffer
     auto graphicsCommandBuffer = getCurrentGraphicsCommandBuffer();
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-    if (vkBeginCommandBuffer(graphicsCommandBuffer, &beginInfo) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to begin recording command buffer!");
-    }
-
+    VK_CHECK(vkBeginCommandBuffer(graphicsCommandBuffer, &beginInfo));
     return CommandBufferPair{graphicsCommandBuffer, computeCommandBuffer};
 }
 
@@ -53,13 +48,8 @@ void VulkanEngineRenderer::endFrame() {
     assert(isFrameStarted && "Can't call endFrame while frame is not in progress!");
     auto commandBuffer = getCurrentGraphicsCommandBuffer();
 
-    if(vkEndCommandBuffer(computeCommandBuffer) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to record compute command buffer!");
-    }
-
-    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to record graphics command buffer!");
-    }
+    VK_CHECK(vkEndCommandBuffer(computeCommandBuffer));
+    VK_CHECK(vkEndCommandBuffer(commandBuffer));
 
     {
         Timer timer("Frame submitting");
@@ -71,9 +61,10 @@ void VulkanEngineRenderer::endFrame() {
         }
 
 
-    if (result != VK_SUCCESS) {
-        fmt::print("Failed to present swap chain image!");
-    }}
+        if (result != VK_SUCCESS) {
+            fmt::print("Failed to present swap chain image!");
+        }
+    }
 
     isFrameStarted = false;
     currentFrameIndex = (currentFrameIndex + 1) % VulkanEngineSwapChain::MAX_FRAMES_IN_FLIGHT;
@@ -139,9 +130,7 @@ void VulkanEngineRenderer::createCommandBuffers() {
     allocInfo.commandPool = engineDevice.getGraphicsCommandPool();
     allocInfo.commandBufferCount = static_cast<uint32_t>(graphicsCommandBuffers.size());
 
-    if (vkAllocateCommandBuffers(engineDevice.getDevice(), &allocInfo, graphicsCommandBuffers.data()) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate command buffers!");
-    }
+    VK_CHECK(vkAllocateCommandBuffers(engineDevice.getDevice(), &allocInfo, graphicsCommandBuffers.data()));
 
     // Create a command buffer for compute operations
     VkCommandBufferAllocateInfo commandBufferAllocateInfo{};
@@ -150,9 +139,7 @@ void VulkanEngineRenderer::createCommandBuffers() {
     commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     commandBufferAllocateInfo.commandBufferCount = 1;
 
-    if (vkAllocateCommandBuffers(engineDevice.getDevice(), &commandBufferAllocateInfo, &computeCommandBuffer) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate command buffer for compute!");
-    }
+    VK_CHECK(vkAllocateCommandBuffers(engineDevice.getDevice(), &commandBufferAllocateInfo, &computeCommandBuffer));
 }
 
 void VulkanEngineRenderer::freeCommandBuffers() {
