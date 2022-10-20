@@ -55,17 +55,14 @@ VulkanEngineEntryPoint::VulkanEngineEntryPoint() {
 }
 
 void VulkanEngineEntryPoint::prepareInputImage() {
+    //Timer timer("Preparing next video frame");
 
     if (PLAY_VIDEO && frameIndex < totalFrames) {
-        //if(frameIndex > 5) { return; }
-
         cv::Mat frame;
-        {
-            Timer timer("OpenCV Video read frame");
-            while (lastReadFrame < frameIndex) {
-                video.read(frame);
-                lastReadFrame += 1;
-            }
+
+        while (lastReadFrame < frameIndex) {
+            video.read(frame);
+            lastReadFrame += 1;
         }
 
         int32_t width = frame.cols;
@@ -80,38 +77,25 @@ void VulkanEngineEntryPoint::prepareInputImage() {
         size_t d_size_rgba = d_width * d_height * 4;
         auto *d_pixels_rgba = new uint8_t[d_size_rgba];
 
-        {
-            Timer timer("OpenCV Image downsampling");
+        // Downscale the video according to VIDEO_DOWNSCALE_FACTOR
+        cv::resize(frame, d_frame, cv::Size(d_width, d_height), cv::INTER_LINEAR);
+        //stbir_resize_uint8(frame.data, (width, height, 0, d_pixels, d_width, d_height, 0, d_channels);
 
-            // Downscale the video according to VIDEO_DOWNSCALE_FACTOR
-            cv::resize(frame, d_frame, cv::Size(d_width, d_height), cv::INTER_LINEAR);
-            //stbir_resize_uint8(frame.data, (width, height, 0, d_pixels, d_width, d_height, 0, d_channels);
+        // Convert from BGR to RGBA
+        size_t currInd = 0;
+        for (size_t i = 0; i < d_size_rgba; i += 4) {
+            d_pixels_rgba[i + 0] = d_frame.data[currInd + 2];
+            d_pixels_rgba[i + 1] = d_frame.data[currInd + 1];
+            d_pixels_rgba[i + 2] = d_frame.data[currInd + 0];
+            d_pixels_rgba[i + 3] = 255;
+            currInd += 3;
         }
 
-        {
-            Timer timer("BGR to RGBA swizzle");
-
-            // Convert from BGR to RGBA
-            size_t currInd = 0;
-            for (size_t i = 0; i < d_size_rgba; i += 4) {
-                d_pixels_rgba[i + 0] = d_frame.data[currInd + 2];
-                d_pixels_rgba[i + 1] = d_frame.data[currInd + 1];
-                d_pixels_rgba[i + 2] = d_frame.data[currInd + 0];
-                d_pixels_rgba[i + 3] = 255;
-                currInd += 3;
-            }
-        }
-
-        {
-            Timer timer("Vulkan updating image");
-
-            inputTexture.fromImageFile(d_pixels_rgba, d_size_rgba, VK_FORMAT_R8G8B8A8_UNORM, d_width, d_height,
-                                       engineDevice,
-                                       engineDevice.graphicsQueue(), VK_FILTER_LINEAR,
-                                       VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-                                       VK_IMAGE_LAYOUT_GENERAL);
-        }
-
+        inputTexture.fromImageFile(d_pixels_rgba, d_size_rgba, VK_FORMAT_R8G8B8A8_UNORM, d_width, d_height,
+                                   engineDevice,
+                                   engineDevice.graphicsQueue(), VK_FILTER_LINEAR,
+                                   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+                                   VK_IMAGE_LAYOUT_GENERAL);
 
         delete[] d_pixels_rgba;
     } else {
@@ -130,7 +114,6 @@ void VulkanEngineEntryPoint::prepareInputImage() {
 
         delete[] pixels;
     }
-
 }
 
 bool VulkanEngineEntryPoint::loadImageFromFile(const std::string &file, void *pixels, size_t &size, int &width,
@@ -677,6 +660,8 @@ void VulkanEngineEntryPoint::prepareComputePipeline(std::vector<VkDescriptorSetL
 }
 
 void VulkanEngineEntryPoint::render() {
+    Timer timer("Rendering");
+
     CommandBufferPair bufferPair = renderer.beginFrame();
     if (bufferPair.computeCommandBuffer != nullptr && bufferPair.graphicsCommandBuffer != nullptr) {
         // Record compute command buffer
@@ -728,6 +713,10 @@ void VulkanEngineEntryPoint::render() {
                                    VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(computePushConstant), &computePushConstant);
                 vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
             }
+
+            // Wait
+            vkCmdPipelineBarrier(bufferPair.computeCommandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                                 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 0, nullptr);
 
             // Fourth ComputeShader call -> Refine transmission with Guided filter
             {

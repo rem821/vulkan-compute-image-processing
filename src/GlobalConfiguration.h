@@ -31,13 +31,13 @@
 #define VALIDATION_LAYER_NAME "VK_LAYER_LUNARG_standard_validation"
 
 // Content section
-#define VIDEO_DOWNSCALE_FACTOR 3
-#define VIDEO_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_2/camera_left_front/video.mp4"
-//#define VIDEO_PATH "../assets/foggy_ride.mp4"
+#define VIDEO_DOWNSCALE_FACTOR 1
+//#define VIDEO_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_2/camera_left_front/video.mp4"
+#define VIDEO_PATH "../assets/foggy_ride.mp4"
 #define IMAGE_PATH "../assets/image.jpg"
 
 // Shaders section
-#define WORKGROUP_COUNT 32
+#define WORKGROUP_COUNT 24
 
 #elif DEVICE_TYPE == 2
 

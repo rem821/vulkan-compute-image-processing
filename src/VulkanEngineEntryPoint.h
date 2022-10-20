@@ -40,7 +40,7 @@ public:
         glm::int32_t imageWidth;
         glm::int32_t imageHeight;
         glm::float32_t omega;
-        glm::float32_t epsilon;
+        alignas(32) glm::float32_t epsilon;
     } computePushConstant;
 
     struct {

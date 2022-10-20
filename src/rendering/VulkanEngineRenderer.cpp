@@ -3,6 +3,7 @@
 //
 
 #include "VulkanEngineRenderer.h"
+#include "../profiling/Timer.h"
 #include <fmt/core.h>
 
 VulkanEngineRenderer::VulkanEngineRenderer(VulkanEngineWindow &window, VulkanEngineDevice &device) : window(window),
@@ -60,15 +61,19 @@ void VulkanEngineRenderer::endFrame() {
         throw std::runtime_error("Failed to record graphics command buffer!");
     }
 
-    auto result = engineSwapChain->submitCommandBuffers(&commandBuffer, &computeCommandBuffer, &currentImageIndex);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || window.wasWindowResized()) {
-        window.resetWindowsResizedFlag();
-        recreateSwapChain();
-    }
+    {
+        Timer timer("Frame submitting");
+
+        auto result = engineSwapChain->submitCommandBuffers(&commandBuffer, &computeCommandBuffer, &currentImageIndex);
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || window.wasWindowResized()) {
+            window.resetWindowsResizedFlag();
+            recreateSwapChain();
+        }
+
 
     if (result != VK_SUCCESS) {
         fmt::print("Failed to present swap chain image!");
-    }
+    }}
 
     isFrameStarted = false;
     currentFrameIndex = (currentFrameIndex + 1) % VulkanEngineSwapChain::MAX_FRAMES_IN_FLIGHT;
