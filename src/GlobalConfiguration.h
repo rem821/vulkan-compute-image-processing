@@ -8,7 +8,7 @@
 //  1 --> Work PC (AMD Radeon card)
 //  2 --> Macbook Pro  16" 2019 (AMD Radeon card)
 
-#define DEVICE_TYPE 0
+#define DEVICE_TYPE 1
 
 #if DEVICE_TYPE == 0
 

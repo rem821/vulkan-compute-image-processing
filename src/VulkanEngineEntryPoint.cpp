@@ -2,13 +2,11 @@
 // Created by Stanislav Svědiroh on 27.09.2022.
 //
 #define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_RESIZE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
 #include "VulkanEngineEntryPoint.h"
 #include "profiling/Timer.h"
 #include "../external/stb/stb_image.h"
-#include "../external/stb/stb_image_resize.h"
 #include "../external/stb/stb_image_write.h"
 #include <vulkan/vulkan.hpp>
 #include <fmt/core.h>
@@ -60,48 +58,61 @@ void VulkanEngineEntryPoint::prepareInputImage() {
 
     if (PLAY_VIDEO && frameIndex < totalFrames) {
         //if(frameIndex > 5) { return; }
-        if (inputTexture.image != nullptr) {
-            inputTexture.destroy(engineDevice);
-        }
 
         cv::Mat frame;
         {
-            Timer timer("Image loading");
+            Timer timer("OpenCV Video read frame");
             while (lastReadFrame < frameIndex) {
                 video.read(frame);
                 lastReadFrame += 1;
             }
         }
+
         int32_t width = frame.cols;
         int32_t height = frame.rows;
 
-        // Downscale the video according to VIDEO_DOWNSCALE_FACTOR
+        cv::Mat d_frame;
         int32_t d_width = width / VIDEO_DOWNSCALE_FACTOR;
         int32_t d_height = height / VIDEO_DOWNSCALE_FACTOR;
         int32_t d_channels = 3;
         size_t d_size = d_width * d_height * d_channels;
-        auto *d_pixels = new uint8_t[d_size];
-        stbir_resize_uint8(frame.data, width, height, 0, d_pixels, d_width, d_height, 0, d_channels);
 
-        // Convert from BGR to RGBA
-        size_t currInd = 0;
         size_t d_size_rgba = d_width * d_height * 4;
         auto *d_pixels_rgba = new uint8_t[d_size_rgba];
-        for (size_t i = 0; i < d_size_rgba; i += 4) {
-            d_pixels_rgba[i + 0] = d_pixels[currInd + 2];
-            d_pixels_rgba[i + 1] = d_pixels[currInd + 1];
-            d_pixels_rgba[i + 2] = d_pixels[currInd + 0];
-            d_pixels_rgba[i + 3] = 255;
-            currInd += 3;
+
+        {
+            Timer timer("OpenCV Image downsampling");
+
+            // Downscale the video according to VIDEO_DOWNSCALE_FACTOR
+            cv::resize(frame, d_frame, cv::Size(d_width, d_height), cv::INTER_LINEAR);
+            //stbir_resize_uint8(frame.data, (width, height, 0, d_pixels, d_width, d_height, 0, d_channels);
         }
 
-        inputTexture.fromImageFile(d_pixels_rgba, d_size_rgba, VK_FORMAT_R8G8B8A8_UNORM, d_width, d_height,
-                                   engineDevice,
-                                   engineDevice.graphicsQueue(), VK_FILTER_LINEAR,
-                                   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-                                   VK_IMAGE_LAYOUT_GENERAL);
+        {
+            Timer timer("BGR to RGBA swizzle");
 
-        delete[] d_pixels;
+            // Convert from BGR to RGBA
+            size_t currInd = 0;
+            for (size_t i = 0; i < d_size_rgba; i += 4) {
+                d_pixels_rgba[i + 0] = d_frame.data[currInd + 2];
+                d_pixels_rgba[i + 1] = d_frame.data[currInd + 1];
+                d_pixels_rgba[i + 2] = d_frame.data[currInd + 0];
+                d_pixels_rgba[i + 3] = 255;
+                currInd += 3;
+            }
+        }
+
+        {
+            Timer timer("Vulkan updating image");
+
+            inputTexture.fromImageFile(d_pixels_rgba, d_size_rgba, VK_FORMAT_R8G8B8A8_UNORM, d_width, d_height,
+                                       engineDevice,
+                                       engineDevice.graphicsQueue(), VK_FILTER_LINEAR,
+                                       VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+                                       VK_IMAGE_LAYOUT_GENERAL);
+        }
+
+
         delete[] d_pixels_rgba;
     } else {
         if (inputTexture.width != 0) return;

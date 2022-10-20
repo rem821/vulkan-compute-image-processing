@@ -50,55 +50,12 @@ Texture2D::fromImageFile(void *buffer, VkDeviceSize bufferSize, VkFormat format,
                          VkQueue copyQueue, VkFilter filter, VkImageUsageFlags imageUsageFlags,
                          VkImageLayout imageLayout) {
     assert(buffer);
-
-    width = texWidth;
-    height = texHeight;
-    mipLevels = 1;
-
     VkMemoryAllocateInfo memAllocInfo{};
     memAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     VkMemoryRequirements memReqs;
 
-    // Use a separate command buffer for texture loading
-    VkCommandBuffer copyCmd = device.beginSingleTimeCommands();
-
-    // Create a host-visible staging buffer that contains the raw image data
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingMemory;
-
-    VkBufferCreateInfo bufferCreateInfo{};
-    bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferCreateInfo.size = bufferSize;
-    // This buffer is used as a transfer source for the buffer copy
-    bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    if (vkCreateBuffer(device.getDevice(), &bufferCreateInfo, nullptr, &stagingBuffer) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create staging buffer for the texture!");
-    }
-
-    // Get memory requirements for the staging buffer (alignment, memory type bits)
-    vkGetBufferMemoryRequirements(device.getDevice(), stagingBuffer, &memReqs);
-
-    memAllocInfo.allocationSize = memReqs.size;
-    // Get memory type index for a host visible buffer
-    memAllocInfo.memoryTypeIndex = device.findMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                                                                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-    if (vkAllocateMemory(device.getDevice(), &memAllocInfo, nullptr, &stagingMemory) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate staging buffer memory for the texture!");
-    }
-    if (vkBindBufferMemory(device.getDevice(), stagingBuffer, stagingMemory, 0) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate staging buffer memory for the texture!");
-    }
-
-    // Copy texture data into staging buffer
-    uint8_t *data;
-    if (vkMapMemory(device.getDevice(), stagingMemory, 0, memReqs.size, 0, (void **) &data) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to map staging buffer memory for the texture!");
-    }
-    memcpy(data, buffer, bufferSize);
-    vkUnmapMemory(device.getDevice(), stagingMemory);
 
     VkBufferImageCopy bufferCopyRegion = {};
     bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -110,44 +67,132 @@ Texture2D::fromImageFile(void *buffer, VkDeviceSize bufferSize, VkFormat format,
     bufferCopyRegion.imageExtent.depth = 1;
     bufferCopyRegion.bufferOffset = 0;
 
-    // Create optimal tiled target image
-    VkImageCreateInfo imageCreateInfo{};
-    imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageCreateInfo.format = format;
-    imageCreateInfo.mipLevels = mipLevels;
-    imageCreateInfo.arrayLayers = 1;
-    imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-    imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    imageCreateInfo.extent = {width, height, 1};
-    imageCreateInfo.usage = imageUsageFlags;
-    // Ensure that the TRANSFER_DST bit is set for staging
-    if (!(imageCreateInfo.usage & VK_IMAGE_USAGE_TRANSFER_DST_BIT)) {
-        imageCreateInfo.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    }
-    if (vkCreateImage(device.getDevice(), &imageCreateInfo, nullptr, &image) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create image for the texture!");
+    // Create a host-visible staging buffer that contains the raw image data
+    {
+        VkBufferCreateInfo bufferCreateInfo{};
+        bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferCreateInfo.size = bufferSize;
+        // This buffer is used as a transfer source for the buffer copy
+        bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        if (vkCreateBuffer(device.getDevice(), &bufferCreateInfo, nullptr, &stagingBuffer) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create staging buffer for the texture!");
+        }
+
+        // Get memory requirements for the staging buffer (alignment, memory type bits)
+        vkGetBufferMemoryRequirements(device.getDevice(), stagingBuffer, &memReqs);
+
+        memAllocInfo.allocationSize = memReqs.size;
+        // Get memory type index for a host visible buffer
+        memAllocInfo.memoryTypeIndex = device.findMemoryType(memReqs.memoryTypeBits,
+                                                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+        if (vkAllocateMemory(device.getDevice(), &memAllocInfo, nullptr, &stagingMemory) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to allocate staging buffer memory for the texture!");
+        }
+        if (vkBindBufferMemory(device.getDevice(), stagingBuffer, stagingMemory, 0) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to allocate staging buffer memory for the texture!");
+        }
+
+        // Copy texture data into staging buffer
+        uint8_t *data;
+        if (vkMapMemory(device.getDevice(), stagingMemory, 0, memReqs.size, 0, (void **) &data) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to map staging buffer memory for the texture!");
+        }
+        memcpy(data, buffer, bufferSize);
+        vkUnmapMemory(device.getDevice(), stagingMemory);
+
+
     }
 
-    vkGetImageMemoryRequirements(device.getDevice(), image, &memReqs);
+    // In case the ImageView doesn't yet exist
+    if (width != texWidth && height != texHeight) {
+        width = texWidth;
+        height = texHeight;
+        mipLevels = 1;
 
-    memAllocInfo.allocationSize = memReqs.size;
+        // Create optimal tiled target image
+        VkImageCreateInfo imageCreateInfo{};
+        imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageCreateInfo.format = format;
+        imageCreateInfo.mipLevels = mipLevels;
+        imageCreateInfo.arrayLayers = 1;
+        imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageCreateInfo.extent = {width, height, 1};
+        imageCreateInfo.usage = imageUsageFlags;
+        // Ensure that the TRANSFER_DST bit is set for staging
+        if (!(imageCreateInfo.usage & VK_IMAGE_USAGE_TRANSFER_DST_BIT)) {
+            imageCreateInfo.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        }
+        if (vkCreateImage(device.getDevice(), &imageCreateInfo, nullptr, &image) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create image for the texture!");
+        }
 
-    memAllocInfo.memoryTypeIndex = device.findMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    if (vkAllocateMemory(device.getDevice(), &memAllocInfo, nullptr, &deviceMemory) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate memory for the texture!");
+        vkGetImageMemoryRequirements(device.getDevice(), image, &memReqs);
+
+        memAllocInfo.allocationSize = memReqs.size;
+
+        memAllocInfo.memoryTypeIndex = device.findMemoryType(memReqs.memoryTypeBits,
+                                                             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        if (vkAllocateMemory(device.getDevice(), &memAllocInfo, nullptr, &deviceMemory) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to allocate memory for the texture!");
+        }
+        if (vkBindImageMemory(device.getDevice(), image, deviceMemory, 0) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to bind memory for the texture!");
+        }
+
+        VkImageSubresourceRange subresourceRange = {};
+        subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        subresourceRange.baseMipLevel = 0;
+        subresourceRange.levelCount = mipLevels;
+        subresourceRange.layerCount = 1;
+
+        // Create sampler
+        VkSamplerCreateInfo samplerCreateInfo = {};
+        samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerCreateInfo.magFilter = filter;
+        samplerCreateInfo.minFilter = filter;
+        samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerCreateInfo.mipLodBias = 0.0f;
+        samplerCreateInfo.compareOp = VK_COMPARE_OP_NEVER;
+        samplerCreateInfo.minLod = 0.0f;
+        samplerCreateInfo.maxLod = 0.0f;
+        samplerCreateInfo.maxAnisotropy = 1.0f;
+        if (vkCreateSampler(device.getDevice(), &samplerCreateInfo, nullptr, &sampler) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create Sampler for the texture!");
+        }
+
+        // Create image view
+        VkImageViewCreateInfo viewCreateInfo = {};
+        viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewCreateInfo.pNext = nullptr;
+        viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewCreateInfo.format = format;
+        viewCreateInfo.components = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B,
+                                     VK_COMPONENT_SWIZZLE_A};
+        viewCreateInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        viewCreateInfo.subresourceRange.levelCount = 1;
+        viewCreateInfo.image = image;
+        if (vkCreateImageView(device.getDevice(), &viewCreateInfo, nullptr, &view) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create ImageView for the texture!");
+        }
+
+        // Update descriptor image info member that can be used for setting up descriptor sets
+        updateDescriptor();
+
     }
-    if (vkBindImageMemory(device.getDevice(), image, deviceMemory, 0) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to bind memory for the texture!");
-    }
 
-    VkImageSubresourceRange subresourceRange = {};
-    subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    subresourceRange.baseMipLevel = 0;
-    subresourceRange.levelCount = mipLevels;
-    subresourceRange.layerCount = 1;
+    // Use a separate command buffer for texture loading
+    VkCommandBuffer copyCmd = device.beginSingleTimeCommands();
 
     // Image barrier for optimal image (target)
     // Optimal image will be used as destination for the copy
@@ -182,41 +227,6 @@ Texture2D::fromImageFile(void *buffer, VkDeviceSize bufferSize, VkFormat format,
     // Clean up staging resources
     vkFreeMemory(device.getDevice(), stagingMemory, nullptr);
     vkDestroyBuffer(device.getDevice(), stagingBuffer, nullptr);
-
-    // Create sampler
-    VkSamplerCreateInfo samplerCreateInfo = {};
-    samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerCreateInfo.magFilter = filter;
-    samplerCreateInfo.minFilter = filter;
-    samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerCreateInfo.mipLodBias = 0.0f;
-    samplerCreateInfo.compareOp = VK_COMPARE_OP_NEVER;
-    samplerCreateInfo.minLod = 0.0f;
-    samplerCreateInfo.maxLod = 0.0f;
-    samplerCreateInfo.maxAnisotropy = 1.0f;
-    if (vkCreateSampler(device.getDevice(), &samplerCreateInfo, nullptr, &sampler) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create Sampler for the texture!");
-    }
-
-    // Create image view
-    VkImageViewCreateInfo viewCreateInfo = {};
-    viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    viewCreateInfo.pNext = NULL;
-    viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    viewCreateInfo.format = format;
-    viewCreateInfo.components = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B,VK_COMPONENT_SWIZZLE_A};
-    viewCreateInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    viewCreateInfo.subresourceRange.levelCount = 1;
-    viewCreateInfo.image = image;
-    if (vkCreateImageView(device.getDevice(), &viewCreateInfo, nullptr, &view) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create ImageView for the texture!");
-    }
-
-    // Update descriptor image info member that can be used for setting up descriptor sets
-    updateDescriptor();
 }
 
 void Texture2D::createTextureTarget(VulkanEngineDevice &engineDevice, Texture2D inputTexture) {
@@ -311,7 +321,8 @@ void Texture2D::createTextureTarget(VulkanEngineDevice &engineDevice, Texture2D 
     view.image = VK_NULL_HANDLE;
     view.viewType = VK_IMAGE_VIEW_TYPE_2D;
     view.format = VK_FORMAT_R8G8B8A8_UNORM;
-    view.components = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A}; // Here it doesn't matter rn as the output is usually BW
+    view.components = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B,
+                       VK_COMPONENT_SWIZZLE_A}; // Here it doesn't matter rn as the output is usually BW
     view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     view.image = image;
     if (vkCreateImageView(engineDevice.getDevice(), &view, nullptr, &this->view) != VK_SUCCESS) {
