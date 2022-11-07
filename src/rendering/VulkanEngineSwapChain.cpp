@@ -85,7 +85,9 @@ VkResult VulkanEngineSwapChain::acquireNextImage(uint32_t *imageIndex) {
     return result;
 }
 
-VkResult VulkanEngineSwapChain::submitCommandBuffers(const VkCommandBuffer *buffers, const VkCommandBuffer *computeCommandBuffer, const uint32_t *imageIndex) {
+VkResult
+VulkanEngineSwapChain::submitCommandBuffers(const VkCommandBuffer *buffers, const VkCommandBuffer *computeCommandBuffer,
+                                            const uint32_t *imageIndex) {
     if (imagesInFlight[*imageIndex] != VK_NULL_HANDLE) {
         vkWaitForFences(engineDevice.getDevice(), 1, &imagesInFlight[*imageIndex], VK_TRUE, UINT64_MAX);
     }
@@ -105,13 +107,14 @@ VkResult VulkanEngineSwapChain::submitCommandBuffers(const VkCommandBuffer *buff
     computeSubmitInfo.signalSemaphoreCount = 1;
     computeSubmitInfo.pSignalSemaphores = &computeSemaphore;
 
-    if(vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, VK_NULL_HANDLE)) {
+    if (vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, VK_NULL_HANDLE)) {
         throw std::runtime_error("Failed to submit compute queue!");
     }
 
-    VkPipelineStageFlags graphicsWaitStageMasks[] = { VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-    VkSemaphore graphicsWaitSemaphores[] = { computeSemaphore };
-    VkSemaphore graphicsSignalSemaphores[] = { renderFinishedSemaphores[currentFrame] };
+    VkPipelineStageFlags graphicsWaitStageMasks[] = {VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+                                                     VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    VkSemaphore graphicsWaitSemaphores[] = {computeSemaphore};
+    VkSemaphore graphicsSignalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
 
     // Submit graphics commands
     VkSubmitInfo graphicsSubmitInfo = {};
@@ -126,7 +129,7 @@ VkResult VulkanEngineSwapChain::submitCommandBuffers(const VkCommandBuffer *buff
     graphicsSubmitInfo.pSignalSemaphores = graphicsSignalSemaphores;
 
     vkResetFences(engineDevice.getDevice(), 1, &inFlightFences[currentFrame]);
-    if(vkQueueSubmit(engineDevice.graphicsQueue(), 1, &graphicsSubmitInfo, inFlightFences[currentFrame])) {
+    if (vkQueueSubmit(engineDevice.graphicsQueue(), 1, &graphicsSubmitInfo, inFlightFences[currentFrame])) {
         throw std::runtime_error("Failed to submit graphics queue!");
     }
 
@@ -193,9 +196,7 @@ void VulkanEngineSwapChain::createSwapChain() {
 
     createInfo.oldSwapchain = oldSwapChain == nullptr ? VK_NULL_HANDLE : oldSwapChain->swapChain;
 
-    if (vkCreateSwapchainKHR(engineDevice.getDevice(), &createInfo, nullptr, &swapChain) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create swap chain!");
-    }
+    VK_CHECK(vkCreateSwapchainKHR(engineDevice.getDevice(), &createInfo, nullptr, &swapChain));
 
     vkGetSwapchainImagesKHR(engineDevice.getDevice(), swapChain, &imageCount, nullptr);
     swapChainImages.resize(imageCount);
@@ -225,9 +226,7 @@ void VulkanEngineSwapChain::createImageViews() {
         viewInfo.subresourceRange.baseArrayLayer = 0;
         viewInfo.subresourceRange.layerCount = 1;
 
-        if (vkCreateImageView(engineDevice.getDevice(), &viewInfo, nullptr, &swapChainImageViews[i]) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create texture image view!");
-        }
+        VK_CHECK(vkCreateImageView(engineDevice.getDevice(), &viewInfo, nullptr, &swapChainImageViews[i]));
     }
 }
 
@@ -271,9 +270,7 @@ void VulkanEngineSwapChain::createDepthResources() {
         viewInfo.subresourceRange.baseArrayLayer = 0;
         viewInfo.subresourceRange.layerCount = 1;
 
-        if (vkCreateImageView(engineDevice.getDevice(), &viewInfo, nullptr, &depthImageViews[i]) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create texture image view!");
-        }
+        VK_CHECK(vkCreateImageView(engineDevice.getDevice(), &viewInfo, nullptr, &depthImageViews[i]));
     }
 }
 
@@ -332,9 +329,7 @@ void VulkanEngineSwapChain::createRenderPass() {
     renderPassInfo.dependencyCount = 1;
     renderPassInfo.pDependencies = &dependency;
 
-    if (vkCreateRenderPass(engineDevice.getDevice(), &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create render pass!");
-    }
+    VK_CHECK(vkCreateRenderPass(engineDevice.getDevice(), &renderPassInfo, nullptr, &renderPass));
 }
 
 void VulkanEngineSwapChain::createFrameBuffers() {
@@ -352,10 +347,7 @@ void VulkanEngineSwapChain::createFrameBuffers() {
         framebufferInfo.height = swapChainExt.height;
         framebufferInfo.layers = 1;
 
-        if (vkCreateFramebuffer(engineDevice.getDevice(), &framebufferInfo, nullptr, &swapChainFramebuffers[i]) !=
-            VK_SUCCESS) {
-            throw std::runtime_error("Failed to create framebuffer!");
-        }
+        VK_CHECK(vkCreateFramebuffer(engineDevice.getDevice(), &framebufferInfo, nullptr, &swapChainFramebuffers[i]));
     }
 }
 
@@ -373,22 +365,19 @@ void VulkanEngineSwapChain::createSyncObjects() {
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        if (vkCreateSemaphore(engineDevice.getDevice(), &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
-            vkCreateSemaphore(engineDevice.getDevice(), &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
-            vkCreateFence(engineDevice.getDevice(), &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create synchronization objects for a frame!");
-        }
+        VK_CHECK(vkCreateSemaphore(engineDevice.getDevice(), &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]));
+        VK_CHECK(vkCreateSemaphore(engineDevice.getDevice(), &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]));
+        VK_CHECK(vkCreateFence(engineDevice.getDevice(), &fenceInfo, nullptr, &inFlightFences[i]));
     }
 
-    if (vkCreateSemaphore(engineDevice.getDevice(), &semaphoreInfo, nullptr, &computeSemaphore) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create semaphore for compute & graphics sync!");
-    }
+    VK_CHECK(vkCreateSemaphore(engineDevice.getDevice(), &semaphoreInfo, nullptr, &computeSemaphore));
 }
 
 VkSurfaceFormatKHR
 VulkanEngineSwapChain::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats) {
     for (const auto &availableFormat: availableFormats) {
-        if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+        if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM &&
+            availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
             return availableFormat;
         }
     }

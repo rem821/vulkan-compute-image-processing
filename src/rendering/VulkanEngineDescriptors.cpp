@@ -7,7 +7,8 @@
 // *************** Descriptor Set Layout Builder *********************
 
 VulkanEngineDescriptorSetLayout::Builder
-&VulkanEngineDescriptorSetLayout::Builder::addBinding(uint32_t binding, VkDescriptorType descriptorType, VkShaderStageFlags stageFlags, uint32_t count) {
+&VulkanEngineDescriptorSetLayout::Builder::addBinding(uint32_t binding, VkDescriptorType descriptorType,
+                                                      VkShaderStageFlags stageFlags, uint32_t count) {
     assert(bindings.count(binding) == 0 && "Binding already in use");
     VkDescriptorSetLayoutBinding layoutBinding{};
     layoutBinding.binding = binding;
@@ -25,8 +26,9 @@ std::unique_ptr<VulkanEngineDescriptorSetLayout> VulkanEngineDescriptorSetLayout
 // *************** Descriptor Set Layout *********************
 
 VulkanEngineDescriptorSetLayout::VulkanEngineDescriptorSetLayout(VulkanEngineDevice &device,
-                                                                 std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding> bindings) : engineDevice{device},
-                                                                                                                                        bindings{bindings} {
+                                                                 std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding> bindings)
+        : engineDevice{device},
+          bindings{bindings} {
     std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings{};
     for (auto kv: bindings) {
         setLayoutBindings.push_back(kv.second);
@@ -37,13 +39,11 @@ VulkanEngineDescriptorSetLayout::VulkanEngineDescriptorSetLayout(VulkanEngineDev
     descriptorSetLayoutInfo.bindingCount = static_cast<uint32_t>(setLayoutBindings.size());
     descriptorSetLayoutInfo.pBindings = setLayoutBindings.data();
 
-    if (vkCreateDescriptorSetLayout(
+    VK_CHECK(vkCreateDescriptorSetLayout(
             engineDevice.getDevice(),
             &descriptorSetLayoutInfo,
             nullptr,
-            &descriptorSetLayout) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create descriptor set layout!");
-    }
+            &descriptorSetLayout));
 }
 
 VulkanEngineDescriptorSetLayout::~VulkanEngineDescriptorSetLayout() {
@@ -75,8 +75,10 @@ std::unique_ptr<VulkanEngineDescriptorPool> VulkanEngineDescriptorPool::Builder:
 
 // *************** Descriptor Pool *********************
 
-VulkanEngineDescriptorPool::VulkanEngineDescriptorPool(VulkanEngineDevice &device, uint32_t maxSets, VkDescriptorPoolCreateFlags poolFlags,
-                                                       const std::vector<VkDescriptorPoolSize> &poolSizes) : engineDevice{device} {
+VulkanEngineDescriptorPool::VulkanEngineDescriptorPool(VulkanEngineDevice &device, uint32_t maxSets,
+                                                       VkDescriptorPoolCreateFlags poolFlags,
+                                                       const std::vector<VkDescriptorPoolSize> &poolSizes)
+        : engineDevice{device} {
     VkDescriptorPoolCreateInfo descriptorPoolInfo{};
     descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     descriptorPoolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
@@ -84,17 +86,15 @@ VulkanEngineDescriptorPool::VulkanEngineDescriptorPool(VulkanEngineDevice &devic
     descriptorPoolInfo.maxSets = maxSets;
     descriptorPoolInfo.flags = poolFlags;
 
-    if (vkCreateDescriptorPool(engineDevice.getDevice(), &descriptorPoolInfo, nullptr, &descriptorPool) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("failed to create descriptor pool!");
-    }
+    VK_CHECK(vkCreateDescriptorPool(engineDevice.getDevice(), &descriptorPoolInfo, nullptr, &descriptorPool));
 }
 
 VulkanEngineDescriptorPool::~VulkanEngineDescriptorPool() {
     vkDestroyDescriptorPool(engineDevice.getDevice(), descriptorPool, nullptr);
 }
 
-bool VulkanEngineDescriptorPool::allocateDescriptor(const VkDescriptorSetLayout descriptorSetLayout, VkDescriptorSet &descriptor) const {
+bool VulkanEngineDescriptorPool::allocateDescriptor(const VkDescriptorSetLayout descriptorSetLayout,
+                                                    VkDescriptorSet &descriptor) const {
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocInfo.descriptorPool = descriptorPool;
@@ -103,9 +103,7 @@ bool VulkanEngineDescriptorPool::allocateDescriptor(const VkDescriptorSetLayout 
 
     // Might want to create a "DescriptorPoolManager" class that handles this case, and builds
     // a new pool whenever an old pool fills up. But this is beyond our current scope
-    if (vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &descriptor) != VK_SUCCESS) {
-        return false;
-    }
+    VK_CHECK(vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &descriptor));
     return true;
 }
 
@@ -123,10 +121,12 @@ void VulkanEngineDescriptorPool::resetPool() {
 
 // *************** Descriptor Writer *********************
 
-VulkanEngineDescriptorWriter::VulkanEngineDescriptorWriter(VulkanEngineDescriptorSetLayout &setLayout, VulkanEngineDescriptorPool &pool)
+VulkanEngineDescriptorWriter::VulkanEngineDescriptorWriter(VulkanEngineDescriptorSetLayout &setLayout,
+                                                           VulkanEngineDescriptorPool &pool)
         : setLayout{setLayout}, pool{pool} {}
 
-VulkanEngineDescriptorWriter &VulkanEngineDescriptorWriter::writeBuffer(uint32_t binding, VkDescriptorBufferInfo *bufferInfo) {
+VulkanEngineDescriptorWriter &
+VulkanEngineDescriptorWriter::writeBuffer(uint32_t binding, VkDescriptorBufferInfo *bufferInfo) {
     assert(setLayout.getBindings().count(binding) == 1 && "Layout does not contain specified binding");
 
     auto &bindingDescription = setLayout.getBindingAt(binding);
@@ -146,7 +146,8 @@ VulkanEngineDescriptorWriter &VulkanEngineDescriptorWriter::writeBuffer(uint32_t
     return *this;
 }
 
-VulkanEngineDescriptorWriter &VulkanEngineDescriptorWriter::writeImage(uint32_t binding, VkDescriptorImageInfo *imageInfo) {
+VulkanEngineDescriptorWriter &
+VulkanEngineDescriptorWriter::writeImage(uint32_t binding, VkDescriptorImageInfo *imageInfo) {
     assert(setLayout.getBindings().count(binding) == 1 && "Layout does not contain specified binding");
 
     auto &bindingDescription = setLayout.getBindingAt(binding);

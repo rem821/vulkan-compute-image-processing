@@ -6,10 +6,7 @@ layout (local_size_x = GROUP_SIZE, local_size_y = GROUP_SIZE) in;
 
 layout (binding = 0, rgba8) uniform readonly image2D inputImage;
 layout (binding = 1, rgba8) uniform image2D resultImage;
-layout (binding = 2) buffer AirLightBuffer {
-    float groups[][3];
-} airLightGroupsData;
-layout (binding = 3) buffer AirLightMaxBuffer {
+layout (binding = 2) buffer AirLightMaxBuffer {
     float channels[3];
 } airLightMaxData;
 layout (push_constant) uniform constants {
@@ -18,35 +15,22 @@ layout (push_constant) uniform constants {
     int imageHeight;
     float omega;
     float epsilon;
-
 } PushConstants;
 
-const int kernelSize = 9;
+const int kernelSize = 3;
 
 struct ImageData
 {
     float pixels[kernelSize * kernelSize];
 } kernelMinChannels;
 
-shared float[GROUP_SIZE][GROUP_SIZE] groupAirLights;
 
 void main()
 {
-    float airRed = 0.0f, airGreen = 0.0f, airBlue = 0.0f;
+    float airRed = airLightMaxData.channels[0];
+    float airGreen = airLightMaxData.channels[1];
+    float airBlue = airLightMaxData.channels[2];
 
-    // If we're calculating transmission (omega is set) find out airLights for each color component
-    if (PushConstants.omega > 0) {
-        airRed = airLightMaxData.channels[0];
-        airGreen = airLightMaxData.channels[1];
-        airBlue = airLightMaxData.channels[2];
-    } else {
-        // Make this equal to one to not cause any effect later if we're calculating dark channel prior
-        airRed = 1.0f;
-        airGreen = 1.0f;
-        airBlue = 1.0f;
-    }
-
-    // Fetch neighbouring texels
     int n = 0;
     for (int i = -kernelSize / 2; i <= kernelSize / 2; ++i)
     {
@@ -55,15 +39,11 @@ void main()
             float pix_x = gl_GlobalInvocationID.x + i;
             float pix_y = gl_GlobalInvocationID.y + j;
             vec3 rgb = vec3(1);
-            if(pix_x < PushConstants.imageWidth && pix_x >= 0 && pix_y < PushConstants.imageHeight && pix_y > 0) {
+            if (pix_x < PushConstants.imageWidth && pix_x >= 0 && pix_y < PushConstants.imageHeight && pix_y > 0) {
                 rgb = imageLoad(inputImage, ivec2(pix_x, pix_y)).rgb;
             }
 
-            float red = rgb.r * airRed;
-            float green = rgb.g * airGreen;
-            float blue = rgb.b * airBlue;
-
-            kernelMinChannels.pixels[n] = min(min(red, green), blue);
+            kernelMinChannels.pixels[n] = min(min(rgb.r * airRed, rgb.g * airGreen), rgb.b * airBlue);
             n++;
         }
     }
@@ -75,50 +55,8 @@ void main()
         }
     }
 
-    vec4 res;
-    // For transmission calculation its  1 - omega * kernelMin
-    if (PushConstants.omega > 0) {
-        float trans = 1 - PushConstants.omega * kernelMin;
-        res = vec4(trans, trans, trans, 1.0);
-    } else {
-        // For dark channel prior save just kernelMin
-        res = vec4(kernelMin, kernelMin, kernelMin, 1.0);
-    }
+    float trans = 1 - PushConstants.omega * kernelMin;
+    vec4 res = vec4(trans, trans, trans, 1.0);
 
-    // Only For Debug Purposes
-    //vec4 res = vec4(gl_WorkGroupID.x / 32.0, gl_WorkGroupID.y / 32.0, 0.0, 1.0);
     imageStore(resultImage, ivec2(gl_GlobalInvocationID.xy), res);
-
-    // We don't need to continue if we're calculating transmission
-    if (PushConstants.omega > 0) return;
-
-    groupAirLights[gl_LocalInvocationID.x][gl_LocalInvocationID.y] = kernelMin;
-
-    groupMemoryBarrier();
-    if (!(gl_LocalInvocationID.x == 0 && gl_LocalInvocationID.y == 0)) {
-        return;
-    }
-
-    float brightestDcpPixelValue = 0.0f;
-    vec2 brightestDcpPixelCoord = vec2(0, 0);
-    for (int y = 0; y < GROUP_SIZE; ++y) {
-        for (int x = 0; x < GROUP_SIZE; ++x) {
-            if (groupAirLights[x][y] > brightestDcpPixelValue) {
-                brightestDcpPixelValue = groupAirLights[x][y];
-                brightestDcpPixelCoord = vec2(x, y);
-            }
-        }
-    }
-
-    vec2 brightestPixelCoord = vec2(gl_WorkGroupID.x * gl_WorkGroupSize.x + brightestDcpPixelCoord.x, gl_WorkGroupID.y * gl_WorkGroupSize.y + brightestDcpPixelCoord.y);
-    vec3 brightestGroupPixel = imageLoad(inputImage, ivec2(brightestPixelCoord.x, brightestPixelCoord.y)).rgb;
-
-    // Only For Debug Purposes
-    //airLightData.groups[gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.y][0] = int(0);
-    //airLightData.groups[gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.y][1] = int(100);
-    //airLightData.groups[gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.y][2] = int(200);
-
-    airLightGroupsData.groups[gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.y][0] = brightestGroupPixel.r;
-    airLightGroupsData.groups[gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.y][1] = brightestGroupPixel.g;
-    airLightGroupsData.groups[gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.y][2] = brightestGroupPixel.b;
 }

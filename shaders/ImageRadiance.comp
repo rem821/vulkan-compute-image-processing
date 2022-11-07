@@ -26,6 +26,5 @@ void main()
     float t0 = max(t, 0.8);
     vec3 radiance = ((I - A) / t0) + A;
 
-
     imageStore(resultImage, ivec2(gl_GlobalInvocationID.xy), vec4(radiance, 1.0f));
 }

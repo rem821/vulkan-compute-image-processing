@@ -8,12 +8,12 @@
 //  1 --> Work PC (AMD Radeon card)
 //  2 --> Macbook Pro  16" 2019 (AMD Radeon card)
 
-#define DEVICE_TYPE 1
+#define DEVICE_TYPE 0
 
 #if DEVICE_TYPE == 0
 
 // Graphics setting section
-#define INTEGRATED_GRAPHICS false
+#define INTEGRATED_GRAPHICS true
 #define VALIDATION_LAYER_NAME "VK_LAYER_LUNARG_standard_validation"
 
 // Content section
@@ -31,9 +31,9 @@
 #define VALIDATION_LAYER_NAME "VK_LAYER_LUNARG_standard_validation"
 
 // Content section
-#define VIDEO_DOWNSCALE_FACTOR 3
-#define VIDEO_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_2/camera_left_front/video.mp4"
-//#define VIDEO_PATH "../assets/foggy_ride.mp4"
+#define VIDEO_DOWNSCALE_FACTOR 1
+//#define VIDEO_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_2/camera_left_front/video.mp4"
+#define VIDEO_PATH "../assets/foggy_ride.mp4"
 #define IMAGE_PATH "../assets/image.jpg"
 
 // Shaders section
@@ -64,12 +64,26 @@
 
 #define SWEEP_FRAMES 40
 
+#define DARK_CHANNEL_PRIOR_SHADER "ImageDarkChannelPrior"
 #define TRANSMISSION_SHADER "ImageTransmission"
 #define MAXIMUM_AIRLIGHT_SHADER "MaximumAirLight"
 #define GUIDED_FILTER_SHADER "GuidedFilter"
 #define RADIANCE_SHADER "ImageRadiance"
 
 // Debugging section
-#define TIMER_ON false
+#define TIMER_ON true
 #define RENDERDOC_ENABLED true
+
+//we want to immediately abort when there is an error. In normal engines this would give an error message to the user, or perform a dump of state.
+using namespace std;
+#define VK_CHECK(x)                                                     \
+	do                                                                  \
+	{                                                                   \
+		VkResult err = x;                                               \
+		if (err)                                                        \
+		{                                                               \
+			std::cout <<"Detected Vulkan error: " << err << std::endl;  \
+			abort();                                                    \
+		}                                                               \
+	} while (0)
 

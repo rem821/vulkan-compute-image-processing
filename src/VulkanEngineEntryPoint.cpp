@@ -2,13 +2,11 @@
 // Created by Stanislav Svědiroh on 27.09.2022.
 //
 #define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_RESIZE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
 #include "VulkanEngineEntryPoint.h"
-
+#include "profiling/Timer.h"
 #include "../external/stb/stb_image.h"
-#include "../external/stb/stb_image_resize.h"
 #include "../external/stb/stb_image_write.h"
 #include <vulkan/vulkan.hpp>
 #include <fmt/core.h>
@@ -18,7 +16,6 @@ VulkanEngineEntryPoint::VulkanEngineEntryPoint() {
 
     // Init resources
     prepareInputImage();
-    temporaryTexture.createTextureTarget(engineDevice, inputTexture);
     darkChannelPriorTexture.createTextureTarget(engineDevice, inputTexture);
     transmissionTexture.createTextureTarget(engineDevice, inputTexture);
     filteredTransmissionTexture.createTextureTarget(engineDevice, inputTexture);
@@ -58,12 +55,11 @@ VulkanEngineEntryPoint::VulkanEngineEntryPoint() {
 }
 
 void VulkanEngineEntryPoint::prepareInputImage() {
-    if (PLAY_VIDEO && frameIndex < totalFrames) {
-        if (inputTexture.image != nullptr) {
-            inputTexture.destroy(engineDevice);
-        }
+    Timer timer("Preparing next video frame");
 
+    if (PLAY_VIDEO && frameIndex < totalFrames) {
         cv::Mat frame;
+
         while (lastReadFrame < frameIndex) {
             video.read(frame);
             lastReadFrame += 1;
@@ -72,22 +68,24 @@ void VulkanEngineEntryPoint::prepareInputImage() {
         int32_t width = frame.cols;
         int32_t height = frame.rows;
 
-        // Downscale the video according to VIDEO_DOWNSCALE_FACTOR
+        cv::Mat d_frame;
         int32_t d_width = width / VIDEO_DOWNSCALE_FACTOR;
         int32_t d_height = height / VIDEO_DOWNSCALE_FACTOR;
         int32_t d_channels = 3;
         size_t d_size = d_width * d_height * d_channels;
-        auto *d_pixels = new uint8_t[d_size];
-        stbir_resize_uint8(frame.data, width, height, 0, d_pixels, d_width, d_height, 0, d_channels);
+
+        size_t d_size_rgba = d_width * d_height * 4;
+        auto *d_pixels_rgba = new uint8_t[d_size_rgba];
+
+        // Downscale the video according to VIDEO_DOWNSCALE_FACTOR
+        cv::resize(frame, d_frame, cv::Size(d_width, d_height), cv::INTER_LINEAR);
 
         // Convert from BGR to RGBA
         size_t currInd = 0;
-        size_t d_size_rgba = d_width * d_height * 4;
-        auto *d_pixels_rgba = new uint8_t[d_size_rgba];
         for (size_t i = 0; i < d_size_rgba; i += 4) {
-            d_pixels_rgba[i + 0] = d_pixels[currInd + 2];
-            d_pixels_rgba[i + 1] = d_pixels[currInd + 1];
-            d_pixels_rgba[i + 2] = d_pixels[currInd + 0];
+            d_pixels_rgba[i + 0] = d_frame.data[currInd + 2];
+            d_pixels_rgba[i + 1] = d_frame.data[currInd + 1];
+            d_pixels_rgba[i + 2] = d_frame.data[currInd + 0];
             d_pixels_rgba[i + 3] = 255;
             currInd += 3;
         }
@@ -95,9 +93,9 @@ void VulkanEngineEntryPoint::prepareInputImage() {
         inputTexture.fromImageFile(d_pixels_rgba, d_size_rgba, VK_FORMAT_R8G8B8A8_UNORM, d_width, d_height,
                                    engineDevice,
                                    engineDevice.graphicsQueue(), VK_FILTER_LINEAR,
-                                   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_LAYOUT_GENERAL);
+                                   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+                                   VK_IMAGE_LAYOUT_GENERAL);
 
-        delete[] d_pixels;
         delete[] d_pixels_rgba;
     } else {
         size_t size;
@@ -109,7 +107,8 @@ void VulkanEngineEntryPoint::prepareInputImage() {
 
         inputTexture.fromImageFile(pixels, size, VK_FORMAT_R8G8B8A8_UNORM, width, height, engineDevice,
                                    engineDevice.graphicsQueue(), VK_FILTER_LINEAR,
-                                   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_LAYOUT_GENERAL);
+                                   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+                                   VK_IMAGE_LAYOUT_GENERAL);
 
         delete[] pixels;
     }
@@ -245,20 +244,16 @@ void VulkanEngineEntryPoint::setupDescriptorSetLayout() {
     descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(setLayoutBindings.size());
 
     VkDescriptorSetLayoutCreateInfo descriptorLayout = descriptorSetLayoutCreateInfo;
-    if (vkCreateDescriptorSetLayout(engineDevice.getDevice(), &descriptorLayout, nullptr,
-                                    &graphics.descriptorSetLayout) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create descriptor set layout!");
-    }
+    VK_CHECK(vkCreateDescriptorSetLayout(engineDevice.getDevice(), &descriptorLayout, nullptr,
+                                         &graphics.descriptorSetLayout));
 
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
     pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutCreateInfo.setLayoutCount = 1;
     pipelineLayoutCreateInfo.pSetLayouts = &graphics.descriptorSetLayout;
 
-    if (vkCreatePipelineLayout(engineDevice.getDevice(), &pipelineLayoutCreateInfo, nullptr,
-                               &graphics.pipelineLayout) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create pipeline layout!");
-    }
+    VK_CHECK(vkCreatePipelineLayout(engineDevice.getDevice(), &pipelineLayoutCreateInfo, nullptr,
+                                    &graphics.pipelineLayout));
 }
 
 void VulkanEngineEntryPoint::prepareGraphicsPipeline() {
@@ -342,10 +337,8 @@ void VulkanEngineEntryPoint::prepareGraphicsPipeline() {
     pipelineCreateInfo.pStages = shaderStages.data();
     pipelineCreateInfo.renderPass = renderer.getSwapChainRenderPass();
 
-    if (vkCreateGraphicsPipelines(engineDevice.getDevice(), VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr,
-                                  &graphics.pipeline) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create graphics pipeline!");
-    }
+    VK_CHECK(vkCreateGraphicsPipelines(engineDevice.getDevice(), VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr,
+                                       &graphics.pipeline));
 }
 
 void VulkanEngineEntryPoint::setupDescriptorPool() {
@@ -376,11 +369,9 @@ void VulkanEngineEntryPoint::setupDescriptorPool() {
     descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     descriptorPoolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     descriptorPoolInfo.pPoolSizes = poolSizes.data();
-    descriptorPoolInfo.maxSets = 10;
+    descriptorPoolInfo.maxSets = 50;
 
-    if (vkCreateDescriptorPool(engineDevice.getDevice(), &descriptorPoolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create descriptor pool!");
-    }
+    VK_CHECK(vkCreateDescriptorPool(engineDevice.getDevice(), &descriptorPoolInfo, nullptr, &descriptorPool));
 }
 
 void VulkanEngineEntryPoint::setupDescriptorSet() {
@@ -391,46 +382,32 @@ void VulkanEngineEntryPoint::setupDescriptorSet() {
     allocInfo.descriptorSetCount = 1;
 
     // Input image (before compute post-processing)
-    if (vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPreCompute) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate pre-compute descriptor set!");
-    }
+    VK_CHECK(vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPreCompute));
 
     // Image processing stage one
-    if (vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPostComputeStageOne) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate post-compute descriptor set!");
-    }
+    VK_CHECK(
+            vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPostComputeStageOne));
 
     // Image processing stage two
-    if (vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPostComputeStageTwo) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate post-compute descriptor set!");
-    }
+    VK_CHECK(
+            vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPostComputeStageTwo));
 
     // Image processing stage three
-    if (vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPostComputeStageThree) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate post-compute descriptor set!");
-    }
+    VK_CHECK(vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo,
+                                      &graphics.descriptorSetPostComputeStageThree));
 
     // Image processing stage four
-    if (vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPostComputeStageFour) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate post-compute descriptor set!");
-    }
+    VK_CHECK(vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo,
+                                      &graphics.descriptorSetPostComputeStageFour));
 
     // Final image (after compute shader processing)
-    if (vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPostComputeFinal) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate post-compute descriptor set!");
-    }
+    VK_CHECK(vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo, &graphics.descriptorSetPostComputeFinal));
 
     updateGraphicsDescriptorSets();
 }
 
 void VulkanEngineEntryPoint::prepareCompute() {
-    // Transmission calculation
+    // DarkChannelPrior calculation
     {
         VkDescriptorSetLayoutBinding inputImageLayoutBinding{};
         inputImageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
@@ -450,12 +427,6 @@ void VulkanEngineEntryPoint::prepareCompute() {
         outputAtmosphericLightLayoutBinding.binding = 2;
         outputAtmosphericLightLayoutBinding.descriptorCount = 1;
 
-        VkDescriptorSetLayoutBinding inputMaxAtmosphericLightLayoutBinding{};
-        inputMaxAtmosphericLightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        inputMaxAtmosphericLightLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-        inputMaxAtmosphericLightLayoutBinding.binding = 3;
-        inputMaxAtmosphericLightLayoutBinding.descriptorCount = 1;
-
         std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
                 // Binding 0: Input image (read-only)
                 inputImageLayoutBinding,
@@ -463,11 +434,9 @@ void VulkanEngineEntryPoint::prepareCompute() {
                 outputImageLayoutBinding,
                 // Binding 2: Output atmospheric light buffer (write)
                 outputAtmosphericLightLayoutBinding,
-                // Binding 3: Input max atmospheric light buffer (read-only)
-                inputMaxAtmosphericLightLayoutBinding
         };
 
-        prepareComputePipeline(setLayoutBindings, (std::string) TRANSMISSION_SHADER);
+        prepareComputePipeline(setLayoutBindings, (std::string) DARK_CHANNEL_PRIOR_SHADER);
     }
 
     // Maximum airLight calculation
@@ -492,6 +461,38 @@ void VulkanEngineEntryPoint::prepareCompute() {
         };
 
         prepareComputePipeline(setLayoutBindings, (std::string) MAXIMUM_AIRLIGHT_SHADER);
+    }
+
+    // Transmission calculation
+    {
+        VkDescriptorSetLayoutBinding inputImageLayoutBinding{};
+        inputImageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        inputImageLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        inputImageLayoutBinding.binding = 0;
+        inputImageLayoutBinding.descriptorCount = 1;
+
+        VkDescriptorSetLayoutBinding outputImageLayoutBinding{};
+        outputImageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        outputImageLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        outputImageLayoutBinding.binding = 1;
+        outputImageLayoutBinding.descriptorCount = 1;
+
+        VkDescriptorSetLayoutBinding inputMaxAtmosphericLightLayoutBinding{};
+        inputMaxAtmosphericLightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        inputMaxAtmosphericLightLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        inputMaxAtmosphericLightLayoutBinding.binding = 2;
+        inputMaxAtmosphericLightLayoutBinding.descriptorCount = 1;
+
+        std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
+                // Binding 0: Input image (read-only)
+                inputImageLayoutBinding,
+                // Binding 1: Output image (write)
+                outputImageLayoutBinding,
+                // Binding 2: Input max atmospheric light buffer (read-only)
+                inputMaxAtmosphericLightLayoutBinding
+        };
+
+        prepareComputePipeline(setLayoutBindings, (std::string) TRANSMISSION_SHADER);
     }
 
     // Guided Filter
@@ -567,6 +568,13 @@ void VulkanEngineEntryPoint::prepareCompute() {
     }
 
     updateComputeDescriptorSets();
+
+    // Push constants
+    computePushConstant.groupCount = WORKGROUP_COUNT * WORKGROUP_COUNT;
+    computePushConstant.imageWidth = glm::int32_t(inputTexture.width);
+    computePushConstant.imageHeight = glm::int32_t(inputTexture.height);
+    computePushConstant.omega = 0.98;
+    computePushConstant.epsilon = 0.000001;
 }
 
 void VulkanEngineEntryPoint::prepareComputePipeline(std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings,
@@ -579,10 +587,8 @@ void VulkanEngineEntryPoint::prepareComputePipeline(std::vector<VkDescriptorSetL
     descriptorLayout.pBindings = setLayoutBindings.data();
     descriptorLayout.bindingCount = static_cast<uint32_t>(setLayoutBindings.size());
 
-    if (vkCreateDescriptorSetLayout(engineDevice.getDevice(), &descriptorLayout, nullptr,
-                                    &compute.at(pipelineIndex).descriptorSetLayout) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create descriptor set layout for compute pipeline!");
-    }
+    VK_CHECK(vkCreateDescriptorSetLayout(engineDevice.getDevice(), &descriptorLayout, nullptr,
+                                         &compute.at(pipelineIndex).descriptorSetLayout));
     VkPushConstantRange pushConstant{};
     pushConstant.offset = 0;
     pushConstant.size = sizeof(computePushConstant);
@@ -595,10 +601,8 @@ void VulkanEngineEntryPoint::prepareComputePipeline(std::vector<VkDescriptorSetL
     pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstant;
     pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 
-    if (vkCreatePipelineLayout(engineDevice.getDevice(), &pipelineLayoutCreateInfo, nullptr,
-                               &compute.at(pipelineIndex).pipelineLayout) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create pipeline layout for compute!");
-    }
+    VK_CHECK(vkCreatePipelineLayout(engineDevice.getDevice(), &pipelineLayoutCreateInfo, nullptr,
+                                    &compute.at(pipelineIndex).pipelineLayout));
 
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -606,10 +610,8 @@ void VulkanEngineEntryPoint::prepareComputePipeline(std::vector<VkDescriptorSetL
     allocInfo.pSetLayouts = &compute.at(pipelineIndex).descriptorSetLayout;
     allocInfo.descriptorSetCount = 1;
 
-    if (vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo,
-                                 &compute.at(pipelineIndex).descriptorSet) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate descriptor sets for compute!");
-    }
+    VK_CHECK(vkAllocateDescriptorSets(engineDevice.getDevice(), &allocInfo,
+                                      &compute.at(pipelineIndex).descriptorSet));
 
     // Create compute shader pipelines
     VkComputePipelineCreateInfo computePipelineCreateInfo{};
@@ -620,26 +622,20 @@ void VulkanEngineEntryPoint::prepareComputePipeline(std::vector<VkDescriptorSetL
     std::string fileName = "../shaders/" + shaderName + ".comp.spv";
     computePipelineCreateInfo.stage = loadShader(fileName, VK_SHADER_STAGE_COMPUTE_BIT);
     VkPipeline pipeline;
-    if (vkCreateComputePipelines(engineDevice.getDevice(), VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr,
-                                 &pipeline) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create compute pipelines!");
-    }
+    VK_CHECK(vkCreateComputePipelines(engineDevice.getDevice(), VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr,
+                                      &pipeline));
     compute.at(pipelineIndex).pipeline = pipeline;
 }
 
 void VulkanEngineEntryPoint::render() {
+    Timer timer("Rendering");
+
     CommandBufferPair bufferPair = renderer.beginFrame();
     if (bufferPair.computeCommandBuffer != nullptr && bufferPair.graphicsCommandBuffer != nullptr) {
         // Record compute command buffer
         if (PLAY_VIDEO || frameIndex == 0) {
             // First ComputeShader call -> calculate DarkChannelPrior + maxAirLight channels for each workgroup
             {
-                computePushConstant.groupCount = WORKGROUP_COUNT * WORKGROUP_COUNT;
-                computePushConstant.imageWidth = glm::int32_t(inputTexture.width);
-                computePushConstant.imageHeight = glm::int32_t(inputTexture.height);
-                computePushConstant.omega = -1.0;
-                computePushConstant.epsilon = 0.000001;
-
                 vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
                                   compute.at(0).pipeline);
                 vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -675,22 +671,6 @@ void VulkanEngineEntryPoint::render() {
 
             // Third ComputeShader call -> calculate transmission
             {
-                moveTempTextureTo(bufferPair, darkChannelPriorTexture);
-                computePushConstant.omega = 0.95;
-                vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                  compute.at(0).pipeline);
-                vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                        compute.at(0).pipelineLayout,
-                                        0, 1, &compute.at(0).descriptorSet, 0,
-                                        nullptr);
-                vkCmdPushConstants(bufferPair.computeCommandBuffer, compute.at(0).pipelineLayout,
-                                   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(computePushConstant), &computePushConstant);
-                vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
-            }
-
-            // Fourth ComputeShader call -> Refine transmission with Guided filter
-            {
-                moveTempTextureTo(bufferPair, transmissionTexture);
                 vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
                                   compute.at(2).pipeline);
                 vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -706,7 +686,7 @@ void VulkanEngineEntryPoint::render() {
             vkCmdPipelineBarrier(bufferPair.computeCommandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                                  VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 0, nullptr);
 
-            // Fifth ComputeShader call -> calculate radiance
+            // Fourth ComputeShader call -> Refine transmission with Guided filter
             {
                 vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
                                   compute.at(3).pipeline);
@@ -714,8 +694,25 @@ void VulkanEngineEntryPoint::render() {
                                         compute.at(3).pipelineLayout,
                                         0, 1, &compute.at(3).descriptorSet, 0,
                                         nullptr);
-
                 vkCmdPushConstants(bufferPair.computeCommandBuffer, compute.at(3).pipelineLayout,
+                                   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(computePushConstant), &computePushConstant);
+                vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
+            }
+
+            // Wait
+            vkCmdPipelineBarrier(bufferPair.computeCommandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                                 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 0, nullptr);
+
+            // Fifth ComputeShader call -> calculate radiance
+            {
+                vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                  compute.at(4).pipeline);
+                vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                        compute.at(4).pipelineLayout,
+                                        0, 1, &compute.at(4).descriptorSet, 0,
+                                        nullptr);
+
+                vkCmdPushConstants(bufferPair.computeCommandBuffer, compute.at(4).pipelineLayout,
                                    VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(computePushConstant),
                                    &computePushConstant);
                 vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
@@ -826,7 +823,7 @@ void VulkanEngineEntryPoint::render() {
 }
 
 void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
-    // Transmission calculation
+    // DarkChannelPrior calculation
     {
         VkWriteDescriptorSet inputImageDescriptorSet{};
         inputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -841,7 +838,7 @@ void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
         outputImageDescriptorSet.dstSet = compute.at(0).descriptorSet;
         outputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         outputImageDescriptorSet.dstBinding = 1;
-        outputImageDescriptorSet.pImageInfo = &temporaryTexture.descriptor;
+        outputImageDescriptorSet.pImageInfo = &darkChannelPriorTexture.descriptor;
         outputImageDescriptorSet.descriptorCount = 1;
 
         VkWriteDescriptorSet outputAirLightBufferDescriptorSet{};
@@ -852,19 +849,10 @@ void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
         outputAirLightBufferDescriptorSet.pBufferInfo = &airLightGroupsBuffer->getBufferInfo();
         outputAirLightBufferDescriptorSet.descriptorCount = 1;
 
-        VkWriteDescriptorSet inputMaxAirLightBufferDescriptorSet{};
-        inputMaxAirLightBufferDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        inputMaxAirLightBufferDescriptorSet.dstSet = compute.at(0).descriptorSet;
-        inputMaxAirLightBufferDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        inputMaxAirLightBufferDescriptorSet.dstBinding = 3;
-        inputMaxAirLightBufferDescriptorSet.pBufferInfo = &airLightMaxBuffer->getBufferInfo();
-        inputMaxAirLightBufferDescriptorSet.descriptorCount = 1;
-
         std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets = {
                 inputImageDescriptorSet,
                 outputImageDescriptorSet,
                 outputAirLightBufferDescriptorSet,
-                inputMaxAirLightBufferDescriptorSet,
         };
         vkUpdateDescriptorSets(engineDevice.getDevice(), computeWriteDescriptorSets.size(),
                                computeWriteDescriptorSets.data(), 0, nullptr);
@@ -896,11 +884,46 @@ void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
                                computeWriteDescriptorSets.data(), 0, nullptr);
     }
 
+    // Transmission calculation
+    {
+        VkWriteDescriptorSet inputImageDescriptorSet{};
+        inputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        inputImageDescriptorSet.dstSet = compute.at(2).descriptorSet;
+        inputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        inputImageDescriptorSet.dstBinding = 0;
+        inputImageDescriptorSet.pImageInfo = &inputTexture.descriptor;
+        inputImageDescriptorSet.descriptorCount = 1;
+
+        VkWriteDescriptorSet outputImageDescriptorSet{};
+        outputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        outputImageDescriptorSet.dstSet = compute.at(2).descriptorSet;
+        outputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        outputImageDescriptorSet.dstBinding = 1;
+        outputImageDescriptorSet.pImageInfo = &transmissionTexture.descriptor;
+        outputImageDescriptorSet.descriptorCount = 1;
+
+        VkWriteDescriptorSet inputMaxAirLightBufferDescriptorSet{};
+        inputMaxAirLightBufferDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        inputMaxAirLightBufferDescriptorSet.dstSet = compute.at(2).descriptorSet;
+        inputMaxAirLightBufferDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        inputMaxAirLightBufferDescriptorSet.dstBinding = 2;
+        inputMaxAirLightBufferDescriptorSet.pBufferInfo = &airLightMaxBuffer->getBufferInfo();
+        inputMaxAirLightBufferDescriptorSet.descriptorCount = 1;
+
+        std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets = {
+                inputImageDescriptorSet,
+                outputImageDescriptorSet,
+                inputMaxAirLightBufferDescriptorSet,
+        };
+        vkUpdateDescriptorSets(engineDevice.getDevice(), computeWriteDescriptorSets.size(),
+                               computeWriteDescriptorSets.data(), 0, nullptr);
+    }
+
     // Guided filter
     {
         VkWriteDescriptorSet guideImageDescriptorSet{};
         guideImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        guideImageDescriptorSet.dstSet = compute.at(2).descriptorSet;
+        guideImageDescriptorSet.dstSet = compute.at(3).descriptorSet;
         guideImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         guideImageDescriptorSet.dstBinding = 0;
         guideImageDescriptorSet.pImageInfo = &inputTexture.descriptor;
@@ -908,7 +931,7 @@ void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
 
         VkWriteDescriptorSet filterInputImageDescriptorSet{};
         filterInputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        filterInputImageDescriptorSet.dstSet = compute.at(2).descriptorSet;
+        filterInputImageDescriptorSet.dstSet = compute.at(3).descriptorSet;
         filterInputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         filterInputImageDescriptorSet.dstBinding = 1;
         filterInputImageDescriptorSet.pImageInfo = &transmissionTexture.descriptor;
@@ -916,7 +939,7 @@ void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
 
         VkWriteDescriptorSet outputImageDescriptorSet{};
         outputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        outputImageDescriptorSet.dstSet = compute.at(2).descriptorSet;
+        outputImageDescriptorSet.dstSet = compute.at(3).descriptorSet;
         outputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         outputImageDescriptorSet.dstBinding = 2;
         outputImageDescriptorSet.pImageInfo = &filteredTransmissionTexture.descriptor;
@@ -935,7 +958,7 @@ void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
     {
         VkWriteDescriptorSet inputImageDescriptorSet{};
         inputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        inputImageDescriptorSet.dstSet = compute.at(3).descriptorSet;
+        inputImageDescriptorSet.dstSet = compute.at(4).descriptorSet;
         inputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         inputImageDescriptorSet.dstBinding = 0;
         inputImageDescriptorSet.pImageInfo = &inputTexture.descriptor;
@@ -943,7 +966,7 @@ void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
 
         VkWriteDescriptorSet transmissionImageDescriptorSet{};
         transmissionImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        transmissionImageDescriptorSet.dstSet = compute.at(3).descriptorSet;
+        transmissionImageDescriptorSet.dstSet = compute.at(4).descriptorSet;
         transmissionImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         transmissionImageDescriptorSet.dstBinding = 1;
         transmissionImageDescriptorSet.pImageInfo = &filteredTransmissionTexture.descriptor;
@@ -951,7 +974,7 @@ void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
 
         VkWriteDescriptorSet outputImageDescriptorSet{};
         outputImageDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        outputImageDescriptorSet.dstSet = compute.at(3).descriptorSet;
+        outputImageDescriptorSet.dstSet = compute.at(4).descriptorSet;
         outputImageDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         outputImageDescriptorSet.dstBinding = 2;
         outputImageDescriptorSet.pImageInfo = &radianceTexture.descriptor;
@@ -959,7 +982,7 @@ void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
 
         VkWriteDescriptorSet maxAirLightBufferDescriptorSet{};
         maxAirLightBufferDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        maxAirLightBufferDescriptorSet.dstSet = compute.at(3).descriptorSet;
+        maxAirLightBufferDescriptorSet.dstSet = compute.at(4).descriptorSet;
         maxAirLightBufferDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         maxAirLightBufferDescriptorSet.dstBinding = 3;
         maxAirLightBufferDescriptorSet.pBufferInfo = &airLightMaxBuffer->getBufferInfo();
@@ -1179,9 +1202,7 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
     imageCreateCI.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     // Create the image
     VkImage dstImage;
-    if (vkCreateImage(engineDevice.getDevice(), &imageCreateCI, nullptr, &dstImage) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create image for screenshot!");
-    }
+    VK_CHECK(vkCreateImage(engineDevice.getDevice(), &imageCreateCI, nullptr, &dstImage));
 
     // Create memory to back up the image
     VkMemoryRequirements memRequirements;
@@ -1194,13 +1215,9 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
     memAllocInfo.memoryTypeIndex = engineDevice.findMemoryType(memRequirements.memoryTypeBits,
                                                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    if (vkAllocateMemory(engineDevice.getDevice(), &memAllocInfo, nullptr, &dstImageMemory) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate memory for screenshot image!");
-    }
+    VK_CHECK(vkAllocateMemory(engineDevice.getDevice(), &memAllocInfo, nullptr, &dstImageMemory));
 
-    if (vkBindImageMemory(engineDevice.getDevice(), dstImage, dstImageMemory, 0) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to bind memory for screenshot image!");
-    }
+    VK_CHECK(vkBindImageMemory(engineDevice.getDevice(), dstImage, dstImageMemory, 0));
 
     // Do the actual blit from the swapchain image to our host visible destination image
     VkCommandBuffer copyCmd = engineDevice.beginSingleTimeCommands();
@@ -1346,9 +1363,7 @@ VkShaderModule VulkanEngineEntryPoint::loadShaderModule(const char *fileName, Vk
         moduleCreateInfo.codeSize = size;
         moduleCreateInfo.pCode = (uint32_t *) shaderCode;
 
-        if (vkCreateShaderModule(device, &moduleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create shader module!");
-        }
+        VK_CHECK(vkCreateShaderModule(device, &moduleCreateInfo, nullptr, &shaderModule));
 
         delete[] shaderCode;
 
@@ -1421,37 +1436,4 @@ void VulkanEngineEntryPoint::handleEvents() {
             frameIndex += SWEEP_FRAMES;
         }
     }
-}
-
-void VulkanEngineEntryPoint::moveTempTextureTo(CommandBufferPair bufferPair, Texture2D destTexture) {
-    setImageLayout(bufferPair.computeCommandBuffer,
-                   destTexture.image,
-                   VK_IMAGE_ASPECT_COLOR_BIT,
-                   VK_IMAGE_LAYOUT_GENERAL,
-                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                   VK_PIPELINE_STAGE_TRANSFER_BIT,
-                   VK_PIPELINE_STAGE_TRANSFER_BIT);
-    setImageLayout(bufferPair.computeCommandBuffer,
-                   temporaryTexture.image,
-                   VK_IMAGE_ASPECT_COLOR_BIT,
-                   VK_IMAGE_LAYOUT_UNDEFINED,
-                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                   VK_PIPELINE_STAGE_TRANSFER_BIT,
-                   VK_PIPELINE_STAGE_TRANSFER_BIT);
-    VkImageCopy imageCopyRegion{};
-    imageCopyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    imageCopyRegion.srcSubresource.layerCount = 1;
-    imageCopyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    imageCopyRegion.dstSubresource.layerCount = 1;
-    imageCopyRegion.extent.width = inputTexture.width;
-    imageCopyRegion.extent.height = inputTexture.height;
-    imageCopyRegion.extent.depth = 1;
-
-    // Issue the copy command
-    vkCmdCopyImage(
-            bufferPair.computeCommandBuffer,
-            temporaryTexture.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            destTexture.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            1,
-            &imageCopyRegion);
 }
