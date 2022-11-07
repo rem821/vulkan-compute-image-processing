@@ -811,7 +811,6 @@ void VulkanEngineEntryPoint::render() {
 
         // Prepare next frame
         frameIndex += 1;
-        //fmt::print("Preparing frame {}\n", frameIndex);
         prepareInputImage();
 
         updateComputeDescriptorSets();
