@@ -8,7 +8,7 @@
 //  1 --> Work PC (AMD Radeon card)
 //  2 --> Macbook Pro  16" 2019 (AMD Radeon card)
 
-#define DEVICE_TYPE 0
+#define DEVICE_TYPE 2
 
 #if DEVICE_TYPE == 0
 
@@ -48,10 +48,10 @@
 // Content section
 #define VIDEO_DOWNSCALE_FACTOR 4
 #define VIDEO_PATH "../assets/video.mp4"
-#define IMAGE_PATH "../assets/image.jpg"
+#define IMAGE_PATH "../assets/haze.jpg"
 
 // Shaders section
-#define WORKGROUP_COUNT 16
+#define WORKGROUP_COUNT 24
 
 #endif
 
@@ -71,7 +71,7 @@
 #define RADIANCE_SHADER "ImageRadiance"
 
 // Debugging section
-#define TIMER_ON true
+#define TIMER_ON false
 #define RENDERDOC_ENABLED true
 
 //we want to immediately abort when there is an error. In normal engines this would give an error message to the user, or perform a dump of state.

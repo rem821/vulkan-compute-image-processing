@@ -355,8 +355,8 @@ void VulkanEngineEntryPoint::setupDescriptorPool() {
     storageImage.descriptorCount = 100;
 
     VkDescriptorPoolSize storageBuffer{};
-    storageImage.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    storageImage.descriptorCount = 100;
+    storageBuffer.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    storageBuffer.descriptorCount = 100;
 
     std::vector<VkDescriptorPoolSize> poolSizes = {
             uniformBuffers,
@@ -743,11 +743,13 @@ void VulkanEngineEntryPoint::render() {
             vkCmdBindVertexBuffers(bufferPair.graphicsCommandBuffer, 0, 1, vertexBuffer->getBuffer(), offsets);
             vkCmdBindIndexBuffer(bufferPair.graphicsCommandBuffer, *indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
+            vkCmdBindPipeline(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
+
             // Top Left (pre compute)
+
             vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                     graphics.pipelineLayout, 0, 1,
                                     &graphics.descriptorSetPreCompute, 0, nullptr);
-            vkCmdBindPipeline(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
 
             vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
 
@@ -755,7 +757,6 @@ void VulkanEngineEntryPoint::render() {
             vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                     graphics.pipelineLayout, 0, 1,
                                     &graphics.descriptorSetPostComputeFinal, 0, nullptr);
-            vkCmdBindPipeline(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
 
             viewport.x = panPosition.x + preWidth;
             vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
@@ -765,7 +766,6 @@ void VulkanEngineEntryPoint::render() {
             vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                     graphics.pipelineLayout, 0, 1,
                                     &graphics.descriptorSetPostComputeStageOne, 0, nullptr);
-            vkCmdBindPipeline(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
 
             viewport.x = panPosition.x;
             viewport.y = panPosition.y + preHeight;
@@ -776,7 +776,6 @@ void VulkanEngineEntryPoint::render() {
             vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                     graphics.pipelineLayout, 0, 1,
                                     &graphics.descriptorSetPostComputeStageTwo, 0, nullptr);
-            vkCmdBindPipeline(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
 
             viewport.x = panPosition.x + preWidth;
             viewport.y = panPosition.y + preHeight;
@@ -787,7 +786,6 @@ void VulkanEngineEntryPoint::render() {
             vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                     graphics.pipelineLayout, 0, 1,
                                     &graphics.descriptorSetPostComputeStageThree, 0, nullptr);
-            vkCmdBindPipeline(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
 
             viewport.x = panPosition.x;
             viewport.y = panPosition.y + (preHeight * 2.0f);
@@ -798,7 +796,6 @@ void VulkanEngineEntryPoint::render() {
             vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                     graphics.pipelineLayout, 0, 1,
                                     &graphics.descriptorSetPostComputeStageFour, 0, nullptr);
-            vkCmdBindPipeline(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
 
             viewport.x = panPosition.x + preWidth;
             viewport.y = panPosition.y + (preHeight * 2.0f);
@@ -1022,8 +1019,7 @@ void VulkanEngineEntryPoint::updateGraphicsDescriptorSets() {
                 uniformDescriptorSet,
                 imageDescriptorSet
         };
-        vkUpdateDescriptorSets(engineDevice.getDevice(), baseImageWriteDescriptorSets.size(),
-                               baseImageWriteDescriptorSets.data(), 0, nullptr);
+        vkUpdateDescriptorSets(engineDevice.getDevice(), baseImageWriteDescriptorSets.size(), baseImageWriteDescriptorSets.data(), 0, nullptr);
     }
 
     // Post-Compute first stage
@@ -1049,8 +1045,7 @@ void VulkanEngineEntryPoint::updateGraphicsDescriptorSets() {
                 inProgressImageDescriptorSet,
         };
 
-        vkUpdateDescriptorSets(engineDevice.getDevice(), writeDescriptorSets.size(), writeDescriptorSets.data(), 0,
-                               nullptr);
+        vkUpdateDescriptorSets(engineDevice.getDevice(), writeDescriptorSets.size(), writeDescriptorSets.data(), 0, nullptr);
     }
 
     // Post-Compute second stage
@@ -1102,6 +1097,9 @@ void VulkanEngineEntryPoint::updateGraphicsDescriptorSets() {
                 inProgressUniformDescriptorSet,
                 inProgressImageDescriptorSet,
         };
+
+        vkUpdateDescriptorSets(engineDevice.getDevice(), writeDescriptorSets.size(), writeDescriptorSets.data(), 0,
+                               nullptr);
     }
 
     // Post-Compute fourth stage

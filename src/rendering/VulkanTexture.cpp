@@ -62,8 +62,8 @@ Texture2D::fromImageFile(void *buffer, VkDeviceSize bufferSize, VkFormat format,
     bufferCopyRegion.imageSubresource.mipLevel = 0;
     bufferCopyRegion.imageSubresource.baseArrayLayer = 0;
     bufferCopyRegion.imageSubresource.layerCount = 1;
-    bufferCopyRegion.imageExtent.width = width;
-    bufferCopyRegion.imageExtent.height = height;
+    bufferCopyRegion.imageExtent.width = texWidth;
+    bufferCopyRegion.imageExtent.height = texHeight;
     bufferCopyRegion.imageExtent.depth = 1;
     bufferCopyRegion.bufferOffset = 0;
 
@@ -94,8 +94,6 @@ Texture2D::fromImageFile(void *buffer, VkDeviceSize bufferSize, VkFormat format,
         VK_CHECK(vkMapMemory(device.getDevice(), stagingMemory, 0, memReqs.size, 0, (void **) &data));
         memcpy(data, buffer, bufferSize);
         vkUnmapMemory(device.getDevice(), stagingMemory);
-
-
     }
 
     // In case the ImageView doesn't yet exist
@@ -166,9 +164,6 @@ Texture2D::fromImageFile(void *buffer, VkDeviceSize bufferSize, VkFormat format,
         viewCreateInfo.image = image;
         VK_CHECK(vkCreateImageView(device.getDevice(), &viewCreateInfo, nullptr, &view));
 
-        // Update descriptor image info member that can be used for setting up descriptor sets
-        updateDescriptor();
-
     }
 
     // Use a separate command buffer for texture loading
@@ -207,6 +202,9 @@ Texture2D::fromImageFile(void *buffer, VkDeviceSize bufferSize, VkFormat format,
     // Clean up staging resources
     vkFreeMemory(device.getDevice(), stagingMemory, nullptr);
     vkDestroyBuffer(device.getDevice(), stagingBuffer, nullptr);
+
+    // Update descriptor image info member that can be used for setting up descriptor sets
+    updateDescriptor();
 }
 
 void Texture2D::createTextureTarget(VulkanEngineDevice &engineDevice, Texture2D inputTexture) {
