@@ -58,27 +58,39 @@ void VulkanEngineEntryPoint::prepareInputImage() {
     Timer timer("Preparing next video frame");
 
     if (PLAY_VIDEO && frameIndex < totalFrames) {
-        cv::Mat frame;
-
         while (lastReadFrame < frameIndex) {
-            video.read(frame);
+            video.read(cameraFrame);
             lastReadFrame += 1;
         }
 
-        int32_t width = frame.cols;
-        int32_t height = frame.rows;
+        if(!heading.empty()) {
+            cameraWindowFrame = cv::Mat(DFT_WINDOW_SIZE, DFT_WINDOW_SIZE * 3, CV_8U, cv::Scalar::all(0));
+            cv::Mat windowFrame = getDFTWindow();
+            size_t currInd = 0;
+            cameraWindowFrame.rows = windowFrame.rows;
+            cameraWindowFrame.cols = windowFrame.cols;
+            for(size_t i = 0; i < windowFrame.cols * windowFrame.rows * 3; i += 3) {
+                cameraWindowFrame.data[i + 0] = windowFrame.data[currInd];
+                cameraWindowFrame.data[i + 1] = windowFrame.data[currInd];
+                cameraWindowFrame.data[i + 2] = windowFrame.data[currInd];
+                currInd ++;
+            }
+            cameraFrame = cameraWindowFrame;
+        }
 
+        int32_t width = cameraFrame.cols;
+        int32_t height = cameraFrame.rows;
+        int32_t size = width * height * 3;
+        /*
         cv::Mat d_frame;
         int32_t d_width = width / VIDEO_DOWNSCALE_FACTOR;
         int32_t d_height = height / VIDEO_DOWNSCALE_FACTOR;
-        int32_t d_channels = 3;
-        size_t d_size = d_width * d_height * d_channels;
 
         size_t d_size_rgba = d_width * d_height * 4;
         auto *d_pixels_rgba = new uint8_t[d_size_rgba];
 
         // Downscale the video according to VIDEO_DOWNSCALE_FACTOR
-        cv::resize(frame, d_frame, cv::Size(d_width, d_height), cv::INTER_LINEAR);
+        cv::resize(cameraFrame, d_frame, cv::Size(d_width, d_height), cv::INTER_LINEAR);
 
         // Convert from BGR to RGBA
         size_t currInd = 0;
@@ -89,8 +101,22 @@ void VulkanEngineEntryPoint::prepareInputImage() {
             d_pixels_rgba[i + 3] = 255;
             currInd += 3;
         }
+        */
 
-        inputTexture.fromImageFile(d_pixels_rgba, d_size_rgba, VK_FORMAT_R8G8B8A8_UNORM, d_width, d_height,
+        size_t d_size_rgba = width * height * 4;
+        auto *d_pixels_rgba = new uint8_t[d_size_rgba];
+
+        // Convert from BGR to RGBA
+        size_t currInd = 0;
+        for (size_t i = 0; i < width * height * 4; i += 4) {
+            d_pixels_rgba[i + 0] = cameraFrame.data[currInd + 2];
+            d_pixels_rgba[i + 1] = cameraFrame.data[currInd + 1];
+            d_pixels_rgba[i + 2] = cameraFrame.data[currInd + 0];
+            d_pixels_rgba[i + 3] = 255;
+            currInd += 3;
+        }
+
+        inputTexture.fromImageFile(d_pixels_rgba, d_size_rgba, VK_FORMAT_R8G8B8A8_UNORM, width, height,
                                    engineDevice,
                                    engineDevice.graphicsQueue(), VK_FILTER_LINEAR,
                                    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
@@ -753,6 +779,7 @@ void VulkanEngineEntryPoint::render() {
 
             vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
 
+            /*
             // Top Right (final image)
             vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                     graphics.pipelineLayout, 0, 1,
@@ -801,7 +828,7 @@ void VulkanEngineEntryPoint::render() {
             viewport.y = panPosition.y + (preHeight * 2.0f);
             vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
             vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
-
+            */
             renderer.endSwapChainRenderPass(bufferPair.graphicsCommandBuffer);
         }
 
@@ -1433,4 +1460,62 @@ void VulkanEngineEntryPoint::handleEvents() {
             frameIndex += SWEEP_FRAMES;
         }
     }
+}
+
+cv::Mat VulkanEngineEntryPoint::getDFTWindow() {
+    int32_t width = cameraFrame.cols;
+    int32_t height = cameraFrame.rows;
+
+    // Estimate position of the road vanishing point
+    int32_t r_vp_x = width / 2 + (HORIZONTAL_SENSITIVITY * headingDif[headingDif.size() - 1]);
+    int32_t r_vp_y = height / 2 + (VERTICAL_SENSITIVITY * attitudeDif[attitudeDif.size() - 1]);
+
+    int32_t window_top_left_x = r_vp_x - (DFT_WINDOW_SIZE / 2);
+    int32_t window_top_left_y = r_vp_y - (DFT_WINDOW_SIZE / 2);
+    cv::Rect window_rect(window_top_left_x, window_top_left_y, DFT_WINDOW_SIZE, DFT_WINDOW_SIZE);
+
+    cv::Mat cameraFrameGray;
+    cv::cvtColor(cameraFrame, cameraFrameGray, cv::COLOR_BGR2GRAY);
+
+    cv::Mat cameraFrameWindow = cameraFrameGray(window_rect);
+
+    int32_t optimalWindowSize = cv::getOptimalDFTSize(DFT_WINDOW_SIZE);
+    cv::Mat paddedWindow;
+    cv::copyMakeBorder(cameraFrameWindow, paddedWindow, 0, optimalWindowSize - cameraFrameWindow.rows, 0, optimalWindowSize - cameraFrameWindow.cols, cv::BORDER_CONSTANT, cv::Scalar::all(0));
+
+    cv::Mat planes[] = {cv::Mat_<float>(paddedWindow), cv::Mat::zeros(paddedWindow.size(), CV_32F)};
+    cv::Mat complexI;
+    cv::merge(planes, 2, complexI);
+
+    cv::dft(complexI, complexI);
+
+    cv::split(complexI, planes);
+    cv::magnitude(planes[0], planes[1], planes[0]);
+    cv::Mat magI = planes[0];
+    cv::Mat magIPow = magI.mul(magI);//(magI^2)/(DFT_WINDOW_SIZE^2);
+    cv::Mat magINorm = magIPow.mul(DFT_WINDOW_SIZE^2);
+
+    magINorm += cv::Scalar::all(1);                    // switch to logarithmic scale
+    cv::log(magINorm, magINorm);
+
+    // crop the spectrum, if it has an odd number of rows or columns
+    magINorm = magINorm(cv::Rect(0, 0, magI.cols & -2, magI.rows & -2));
+    // rearrange the quadrants of Fourier image  so that the origin is at the image center
+    int cx = magINorm.cols/2;
+    int cy = magINorm.rows/2;
+    cv::Mat q0(magINorm, cv::Rect(0, 0, cx, cy));   // Top-Left - Create a ROI per quadrant
+    cv::Mat q1(magINorm, cv::Rect(cx, 0, cx, cy));  // Top-Right
+    cv::Mat q2(magINorm, cv::Rect(0, cy, cx, cy));  // Bottom-Left
+    cv::Mat q3(magINorm, cv::Rect(cx, cy, cx, cy)); // Bottom-Right
+    cv::Mat tmp;                           // swap quadrants (Top-Left with Bottom-Right)
+    q0.copyTo(tmp);
+    q3.copyTo(q0);
+    tmp.copyTo(q3);
+    q1.copyTo(tmp);                    // swap quadrant (Top-Right with Bottom-Left)
+    q2.copyTo(q1);
+    tmp.copyTo(q2);
+
+    cv::normalize(magINorm, magINorm, 0, 255, cv::NORM_MINMAX);
+    cv::Mat intMagI = cv::Mat_<uint8_t>(magINorm);
+    return intMagI;
 }

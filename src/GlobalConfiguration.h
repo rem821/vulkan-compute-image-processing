@@ -46,7 +46,7 @@
 #define VALIDATION_LAYER_NAME "VK_LAYER_KHRONOS_validation"
 
 // Content section
-#define VIDEO_DOWNSCALE_FACTOR 4
+#define VIDEO_DOWNSCALE_FACTOR 1
 #define VIDEO_PATH "../assets/video.mp4"
 #define IMAGE_PATH "../assets/haze.jpg"
 
@@ -69,6 +69,15 @@
 #define MAXIMUM_AIRLIGHT_SHADER "MaximumAirLight"
 #define GUIDED_FILTER_SHADER "GuidedFilter"
 #define RADIANCE_SHADER "ImageRadiance"
+
+// IMU
+#define MAX_HEADING_DIF 3
+#define MAX_ATTITUDE_DIF 3
+#define HORIZONTAL_SENSITIVITY 0//100
+#define VERTICAL_SENSITIVITY 0//5000
+
+// DFT
+#define DFT_WINDOW_SIZE 128
 
 // Debugging section
 #define TIMER_ON false

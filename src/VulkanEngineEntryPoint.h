@@ -67,7 +67,7 @@ public:
     ~VulkanEngineEntryPoint() = default;
 
     void prepareInputImage();
-    static bool loadImageFromFile(const std::string& file, void *pixels, size_t &size, int &width, int &height, int &channels);
+    static bool loadImageFromFile(const std::string &file, void *pixels, size_t &size, int &width, int &height, int &channels);
     void generateQuad();
     void setupVertexDescriptions();
     void prepareVertexUniformBuffer();
@@ -81,6 +81,13 @@ public:
     void updateComputeDescriptorSets();
     void updateGraphicsDescriptorSets();
 
+    void setImuPose(std::vector<float> &heading, std::vector<float> &headingDif, std::vector<float> &attitude, std::vector<float> &attitudeDif) {
+        this->heading = heading;
+        this->headingDif = headingDif;
+        this->attitude = attitude;
+        this->attitudeDif = attitudeDif;
+    }
+
     void render();
     void handleEvents();
 
@@ -93,14 +100,16 @@ private:
     VkPipelineShaderStageCreateInfo loadShader(std::string fileName, VkShaderStageFlagBits stage);
     VkShaderModule loadShaderModule(const char *fileName, VkDevice device);
 
-    void prepareComputePipeline(std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings, const std::string& shaderName);
+    void prepareComputePipeline(std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings, const std::string &shaderName);
+
+    cv::Mat getDFTWindow();
 
     VulkanEngineWindow window{WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE};
     VulkanEngineDevice engineDevice{window, WINDOW_TITLE};
     VulkanEngineRenderer renderer{window, engineDevice};
     Camera camera{};
 
-    cv::VideoCapture video{VIDEO_PATH };
+    cv::VideoCapture video{VIDEO_PATH};
     double lastReadFrame = -1;
     double totalFrames = video.get(cv::CAP_PROP_FRAME_COUNT);
 
@@ -129,6 +138,16 @@ private:
     glm::vec2 mouseDragOrigin;
     float zoom = 0.0f;
     glm::vec2 panPosition = glm::vec2(0.0f, 0.0f);
+
+    // Camera
+    cv::Mat cameraFrame;
+    cv::Mat cameraWindowFrame;
+    // IMU Pose
+    std::vector<float> heading;
+    std::vector<float> headingDif;
+
+    std::vector<float> attitude;
+    std::vector<float> attitudeDif;
 };
 
 
