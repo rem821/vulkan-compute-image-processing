@@ -49,6 +49,8 @@
 #define VIDEO_DOWNSCALE_FACTOR 1
 #define VIDEO_PATH "../assets/video.mp4"
 #define IMAGE_PATH "../assets/haze.jpg"
+#define TIMESTAMPS_PATH "../assets/timestamps.txt"
+#define IMU_PATH "../assets/imu.txt"
 
 // Shaders section
 #define WORKGROUP_COUNT 24
@@ -73,8 +75,8 @@
 // IMU
 #define MAX_HEADING_DIF 3
 #define MAX_ATTITUDE_DIF 3
-#define HORIZONTAL_SENSITIVITY 0//100
-#define VERTICAL_SENSITIVITY 0//5000
+#define HORIZONTAL_SENSITIVITY 100
+#define VERTICAL_SENSITIVITY 5000
 
 // DFT
 #define DFT_WINDOW_SIZE 128

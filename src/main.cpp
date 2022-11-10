@@ -27,7 +27,7 @@ int main() {
         }
     }
 
-    io::CSVReader<1> in_timestamps("../assets/timestamps.txt");
+    io::CSVReader<1> in_timestamps(TIMESTAMPS_PATH);
     in_timestamps.read_header(io::ignore_extra_column, "timestamp");
 
     std::vector<long> timestamps;
@@ -36,7 +36,7 @@ int main() {
         timestamps.emplace_back(_t);
     }
 
-    io::CSVReader<11> in_imu("../assets/imu.txt");
+    io::CSVReader<11> in_imu(IMU_PATH);
     in_imu.read_header(io::ignore_extra_column, "timestamp", "acc_x", "acc_y", "acc_z", "ang_vel_x", "ang_vel_y", "ang_vel_z", "quat_x", "quat_y", "quat_z", "quat_w");
     std::vector<long> imu_timestamps;
     std::vector<float> acc_x, acc_y, acc_z, ang_vel_x, ang_vel_y, ang_vel_z, quat_x, quat_y, quat_z, quat_w;
