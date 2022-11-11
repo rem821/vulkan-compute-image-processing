@@ -11,6 +11,7 @@
 #include <vulkan/vulkan.hpp>
 #include <fmt/core.h>
 #include <vector>
+#include "util/polyfit.h"
 
 VulkanEngineEntryPoint::VulkanEngineEntryPoint() {
 
@@ -1045,7 +1046,8 @@ void VulkanEngineEntryPoint::updateGraphicsDescriptorSets() {
                 uniformDescriptorSet,
                 imageDescriptorSet
         };
-        vkUpdateDescriptorSets(engineDevice.getDevice(), baseImageWriteDescriptorSets.size(), baseImageWriteDescriptorSets.data(), 0, nullptr);
+        vkUpdateDescriptorSets(engineDevice.getDevice(), baseImageWriteDescriptorSets.size(),
+                               baseImageWriteDescriptorSets.data(), 0, nullptr);
     }
 
     // Post-Compute first stage
@@ -1071,7 +1073,8 @@ void VulkanEngineEntryPoint::updateGraphicsDescriptorSets() {
                 inProgressImageDescriptorSet,
         };
 
-        vkUpdateDescriptorSets(engineDevice.getDevice(), writeDescriptorSets.size(), writeDescriptorSets.data(), 0, nullptr);
+        vkUpdateDescriptorSets(engineDevice.getDevice(), writeDescriptorSets.size(), writeDescriptorSets.data(), 0,
+                               nullptr);
     }
 
     // Post-Compute second stage
@@ -1463,6 +1466,7 @@ void VulkanEngineEntryPoint::handleEvents() {
 }
 
 cv::Mat VulkanEngineEntryPoint::getDFTWindow() {
+    Timer timer("Calculating DFT window");
 
     // Estimate position of the road vanishing point
     int32_t r_vp_x = cameraFrame.cols / 2 + int32_t(HORIZONTAL_SENSITIVITY * headingDif[headingDif.size() - 1]);
@@ -1479,7 +1483,8 @@ cv::Mat VulkanEngineEntryPoint::getDFTWindow() {
 
     int32_t optimalWindowSize = cv::getOptimalDFTSize(DFT_WINDOW_SIZE);
     cv::Mat paddedWindow;
-    cv::copyMakeBorder(cameraFrameWindow, paddedWindow, 0, optimalWindowSize - cameraFrameWindow.rows, 0, optimalWindowSize - cameraFrameWindow.cols,
+    cv::copyMakeBorder(cameraFrameWindow, paddedWindow, 0, optimalWindowSize - cameraFrameWindow.rows, 0,
+                       optimalWindowSize - cameraFrameWindow.cols,
                        cv::BORDER_CONSTANT, cv::Scalar::all(0));
 
     cv::Mat planes[] = {cv::Mat_<float>(paddedWindow), cv::Mat::zeros(paddedWindow.size(), CV_32F)};
@@ -1516,24 +1521,45 @@ cv::Mat VulkanEngineEntryPoint::getDFTWindow() {
     tmp.copyTo(q2);
 
     cv::Mat magINormPolar;
-    cv::warpPolar(magINorm, magINormPolar, cv::Size(magI.cols, magI.rows), cv::Point2f(magI.cols / 2, magI.rows / 2), magI.rows / 2, cv::WARP_POLAR_LINEAR);
+    cv::warpPolar(magINorm, magINormPolar, cv::Size(magI.cols, magI.rows), cv::Point2f(magI.cols / 2, magI.rows / 2),
+                  magI.rows / 2, cv::WARP_POLAR_LINEAR);
     cv::Mat intMagINormPolar = cv::Mat_<uint8_t>(magINormPolar);
 
     cv::normalize(magINorm, magINorm, 0, 255, cv::NORM_MINMAX);
     cv::Mat intMagINorm = cv::Mat_<uint8_t>(magINorm);
 
-    int rowSum[DFT_WINDOW_SIZE] = { 0 };
-    for(int i = 0; i < intMagINormPolar.rows; i++) {
-        for(int j = 0; j < intMagINormPolar.cols; j++) {
-            rowSum[j] += intMagINormPolar.data[j + i * intMagINormPolar.cols];
+    std::vector<double> pss(DFT_WINDOW_SIZE);
+    std::vector<double> freq(DFT_WINDOW_SIZE);
+    for (int i = 0; i < intMagINormPolar.rows; i++) {
+        for (int j = 0; j < intMagINormPolar.cols; j++) {
+            pss[j] += intMagINormPolar.data[j + i * intMagINormPolar.cols];
+            if (i == 0) freq[j] = (j + i * intMagINormPolar.cols) / 2.0;
         }
     }
 
-    cout << "[ ";
-    for(int i = 0; i < intMagINormPolar.cols; i++) {
-        cout << int(rowSum[i]);
+    cout << "PSS = [ ";
+    for (int i = 0; i < intMagINormPolar.cols; i++) {
+        cout << int(pss[i]);
         cout << " ";
     }
     cout << " ]" << endl;
+
+    cout << "Freq = [ ";
+    for (int i = 0; i < intMagINormPolar.cols; i++) {
+        cout << freq[i];
+        cout << " ";
+    }
+    cout << " ]" << endl;
+
+    std::vector<double> coeffs(3);;
+    polyfit(freq, pss, coeffs, 2);
+
+    cout << "Coeffs = [ ";
+    for (int i = 0; i < 3; i++) {
+        cout << coeffs[i];
+        cout << " ";
+    }
+    cout << " ]" << endl;
+
     return intMagINormPolar;
 }

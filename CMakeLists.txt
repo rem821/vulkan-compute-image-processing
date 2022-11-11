@@ -29,7 +29,7 @@ find_package(Vulkan REQUIRED)
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
-target_link_libraries(${NAME} Vulkan::Vulkan SDL2 fmt glm ImGui ${OpenCV_LIBS} -ldl)
+target_link_libraries(${NAME} Vulkan::Vulkan SDL2 fmt glm ImGui ${OpenCV_LIBS} -ldl -pthread)
 
 ############## Build SHADERS #######################
 

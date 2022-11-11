@@ -75,7 +75,7 @@ void VulkanEngineDevice::createInstance(const char *title) {
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "VulkanEngine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_3;
+    appInfo.apiVersion = VK_API_VERSION_1_2;
 
     VkInstanceCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -277,7 +277,9 @@ std::vector<const char *> VulkanEngineDevice::getRequiredExtensions() {
         availableExtensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
 
-    availableExtensions.emplace_back("VK_KHR_get_physical_device_properties2");
+    #if DEVICE_TYPE == 2
+        availableExtensions.emplace_back("VK_KHR_get_physical_device_properties2");
+    #endif
 
     return availableExtensions;
 }

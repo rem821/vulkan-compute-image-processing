@@ -8,7 +8,7 @@
 //  1 --> Work PC (AMD Radeon card)
 //  2 --> Macbook Pro  16" 2019 (AMD Radeon card)
 
-#define DEVICE_TYPE 2
+#define DEVICE_TYPE 1
 
 #if DEVICE_TYPE == 0
 
@@ -32,9 +32,11 @@
 
 // Content section
 #define VIDEO_DOWNSCALE_FACTOR 1
-//#define VIDEO_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_2/camera_left_front/video.mp4"
-#define VIDEO_PATH "../assets/foggy_ride.mp4"
+#define VIDEO_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_2/camera_left_front/video.mp4"
+//#define VIDEO_PATH "../assets/foggy_ride.mp4"
 #define IMAGE_PATH "../assets/image.jpg"
+#define TIMESTAMPS_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_2/camera_left_front/timestamps.txt"
+#define IMU_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_2/imu/imu.txt"
 
 // Shaders section
 #define WORKGROUP_COUNT 24
@@ -82,7 +84,7 @@
 #define DFT_WINDOW_SIZE 128
 
 // Debugging section
-#define TIMER_ON false
+#define TIMER_ON true
 #define RENDERDOC_ENABLED true
 
 //we want to immediately abort when there is an error. In normal engines this would give an error message to the user, or perform a dump of state.
