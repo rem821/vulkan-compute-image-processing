@@ -102,8 +102,6 @@ private:
 
     void prepareComputePipeline(std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings, const std::string &shaderName);
 
-    cv::Mat getDFTWindow();
-
     VulkanEngineWindow window{WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE};
     VulkanEngineDevice engineDevice{window, WINDOW_TITLE};
     VulkanEngineRenderer renderer{window, engineDevice};
@@ -148,6 +146,11 @@ private:
 
     std::vector<float> attitude;
     std::vector<float> attitudeDif;
+
+    // Visibility calculation
+    std::pair<int, int> vanishingPoint;
+    std::vector<float> visibilityCoeffs;
+    std::vector<float> visibility;
 };
 
 
