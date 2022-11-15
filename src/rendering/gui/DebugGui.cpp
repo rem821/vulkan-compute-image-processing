@@ -52,7 +52,7 @@ DebugGui::~DebugGui() {
     ImGui_ImplVulkan_Shutdown();
 }
 
-void DebugGui::showWindow(SDL_Window *window) {
+void DebugGui::showWindow(SDL_Window *window, long frameIndex) {
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplSDL2_NewFrame(window);
 
@@ -77,16 +77,22 @@ void DebugGui::showWindow(SDL_Window *window) {
         return;
     }
 
-    // Frame time
-    ImGui::Text("FrameTime: %f ms", 16.67);
+    // Frame index
+    ImGui::Text("Frame: %ld", frameIndex);
 
-    // Frames per second - moving average
-    movingFPSAverage = (0.08f * (1.0f / 16.67)) + (1.0f - 0.08f) * movingFPSAverage;
+    // Running time, Frame time and FPS (Moving Average)
+
+    ImGui::Text("Running time: %f s", ImGui::GetTime());
+    double frameTime = (ImGui::GetTime() - lastFrameTimestamp) * 1000;
+    ImGui::Text("Frame time: %f ms", frameTime);
+    movingFPSAverage = (0.08f * (1000.0f / frameTime)) + (1.0f - 0.08f) * movingFPSAverage;
     ImGui::Text("FPS: %f", movingFPSAverage);
+    lastFrameTimestamp = ImGui::GetTime();
 
     ImGui::End();
 
     ImGui::Render();
+
 }
 
 void DebugGui::render(VkCommandBuffer &commandBuffer) {

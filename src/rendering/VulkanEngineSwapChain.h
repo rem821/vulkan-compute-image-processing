@@ -12,7 +12,7 @@
 
 class VulkanEngineSwapChain {
 public:
-    static constexpr int MAX_FRAMES_IN_FLIGHT = 1;
+    static constexpr int MAX_FRAMES_IN_FLIGHT = 3;
 
     VulkanEngineSwapChain(VulkanEngineDevice &engineDevice, VkExtent2D extent);
     VulkanEngineSwapChain(VulkanEngineDevice &engineDevice, VkExtent2D extent,

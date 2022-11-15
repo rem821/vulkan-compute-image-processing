@@ -13,6 +13,7 @@
 #include "imgui_impl_vulkan.h"
 
 #include <vector>
+#include <chrono>
 
 class DebugGui {
 public:
@@ -22,15 +23,13 @@ public:
     DebugGui(const DebugGui &) = delete;
     DebugGui &operator=(const DebugGui &) = delete;
 
-    void showWindow(SDL_Window *window);
+    void showWindow(SDL_Window *window, long frameIndex);
 
     void render(VkCommandBuffer &commandBuffer);
     void processEvent(SDL_Event event);
 private:
-
+    double lastFrameTimestamp = 0;
     double movingFPSAverage = 0;
-    bool chunkBordersShown = false;
-    bool renderWireframes = false;
 
     std::unique_ptr<VulkanEngineDescriptorPool> imguiPool{};
 };

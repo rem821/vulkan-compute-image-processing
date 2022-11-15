@@ -32,8 +32,6 @@ int main() {
         if (rdoc_api && RENDERDOC_ENABLED) rdoc_api->StartFrameCapture(nullptr, nullptr);
         entryPoint->render();
         if (rdoc_api && RENDERDOC_ENABLED) rdoc_api->EndFrameCapture(nullptr, nullptr);
-
-        //std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 
     return 0;

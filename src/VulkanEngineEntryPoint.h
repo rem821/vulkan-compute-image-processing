@@ -12,6 +12,7 @@
 #include "rendering/Camera.h"
 #include "rendering/VulkanTools.h"
 #include "GlobalConfiguration.h"
+#include "rendering/gui/DebugGui.h"
 
 #include "opencv4/opencv2/opencv.hpp"
 
@@ -106,6 +107,7 @@ private:
     VulkanEngineDevice engineDevice{window, WINDOW_TITLE};
     VulkanEngineRenderer renderer{window, engineDevice};
     Camera camera{};
+    DebugGui debugGui{engineDevice, renderer, window.sdlWindow()};
 
     cv::VideoCapture video{VIDEO_PATH};
     double lastReadFrame = -1;

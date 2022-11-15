@@ -635,6 +635,8 @@ void VulkanEngineEntryPoint::render() {
     CommandBufferPair bufferPair = renderer.beginFrame();
     if (bufferPair.computeCommandBuffer != nullptr && bufferPair.graphicsCommandBuffer != nullptr) {
         // Record compute command buffer
+
+        debugGui.showWindow(window.sdlWindow(), frameIndex);
         if (PLAY_VIDEO || frameIndex == 0) {
             // First ComputeShader call -> calculate DarkChannelPrior + maxAirLight channels for each workgroup
             {
@@ -755,7 +757,6 @@ void VulkanEngineEntryPoint::render() {
 
             vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
 
-            /*
             // Top Right (final image)
             vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                     graphics.pipelineLayout, 0, 1,
@@ -804,7 +805,9 @@ void VulkanEngineEntryPoint::render() {
             viewport.y = panPosition.y + (preHeight * 2.0f);
             vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
             vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
-            */
+
+            debugGui.render(bufferPair.graphicsCommandBuffer);
+
             renderer.endSwapChainRenderPass(bufferPair.graphicsCommandBuffer);
         }
 

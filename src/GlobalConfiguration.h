@@ -39,7 +39,7 @@
 #define IMU_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_1/imu/imu.txt"
 
 // Shaders section
-#define WORKGROUP_COUNT 24
+#define WORKGROUP_COUNT 64
 
 #elif DEVICE_TYPE == 2
 
@@ -85,7 +85,7 @@
 
 // Debugging section
 #define TIMER_ON true
-#define RENDERDOC_ENABLED true
+#define RENDERDOC_ENABLED false
 
 //we want to immediately abort when there is an error. In normal engines this would give an error message to the user, or perform a dump of state.
 using namespace std;
