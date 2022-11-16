@@ -143,5 +143,10 @@ private:
     VkQueue computeQueue_;
 
     const std::vector<const char *> validationLayers = {VALIDATION_LAYER_NAME};
-    const std::vector<const char *> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_KHR_portability_subset"};
+
+    #if DEVICE_TYPE == 2
+        const std::vector<const char *> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_KHR_portability_subset"};
+    #else
+        const std::vector<const char *> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+    #endif
 };

@@ -1,10 +1,12 @@
-#include <iostream>
-
 #include "VulkanEngineEntryPoint.h"
 
+#include <string>
 #include <dlfcn.h>
+
+
 #include "GlobalConfiguration.h"
 #include "../external/renderdoc/renderdoc_app.h"
+#include "algorithms/ImuExtract.h"
 
 RENDERDOC_API_1_1_2 *rdoc_api = nullptr;
 
@@ -21,16 +23,15 @@ int main() {
         }
     }
 
-
-    VulkanEngineEntryPoint* entryPoint = new VulkanEngineEntryPoint();
-    while(entryPoint->isRunning) {
+    auto *imu = new ImuExtract();
+    auto *entryPoint = new VulkanEngineEntryPoint();
+    while (entryPoint->isRunning) {
+        imu->extractData(entryPoint->frameIndex);
+        entryPoint->setImuPose(imu->heading, imu->headingDif, imu->attitude, imu->attitudeDif);
         entryPoint->handleEvents();
         if (rdoc_api && RENDERDOC_ENABLED) rdoc_api->StartFrameCapture(nullptr, nullptr);
         entryPoint->render();
         if (rdoc_api && RENDERDOC_ENABLED) rdoc_api->EndFrameCapture(nullptr, nullptr);
-
-        //std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
     }
 
     return 0;

@@ -11,8 +11,13 @@
 
 struct Timer {
 
-    std::chrono::time_point<std::chrono::steady_clock> start, end;
+    #if DEVICE_TYPE == 2
+        std::chrono::time_point<std::chrono::steady_clock> start, end;
+    #else
+        std::chrono::time_point<std::chrono::system_clock> start, end;
+    #endif
     std::chrono::duration<float> duration;
+
 
     std::string _name;
 
