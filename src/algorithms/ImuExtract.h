@@ -11,7 +11,7 @@
 class ImuExtract {
 public:
     ImuExtract() {
-        io::CSVReader<1> in_timestamps(TIMESTAMPS_PATH);
+        io::CSVReader<1> in_timestamps(std::string(SESSION_PATH) + std::string(TIMESTAMPS_PATH));
         in_timestamps.read_header(io::ignore_extra_column, "timestamp");
 
         long _t;
@@ -19,7 +19,7 @@ public:
             timestamps.emplace_back(_t);
         }
 
-        io::CSVReader<11> in_imu(IMU_PATH);
+        io::CSVReader<11> in_imu(std::string(SESSION_PATH) + std::string(IMU_PATH));
         in_imu.read_header(io::ignore_extra_column, "timestamp", "acc_x", "acc_y", "acc_z", "ang_vel_x", "ang_vel_y", "ang_vel_z", "quat_x", "quat_y", "quat_z", "quat_w");
         float _acc_x, _acc_y, _acc_z, _ang_vel_x, _ang_vel_y, _ang_vel_z, _quat_x, _quat_y, _quat_z, _quat_w;
         while (in_imu.read_row(_t, _acc_x, _acc_y, _acc_z, _ang_vel_x, _ang_vel_y, _ang_vel_z, _quat_x, _quat_y, _quat_z, _quat_w)) {
@@ -68,17 +68,17 @@ public:
         }
     }
 
-    std::vector<float> heading;
-    std::vector<float> headingDif;
+    std::vector<double> heading;
+    std::vector<double> headingDif;
 
-    std::vector<float> attitude;
-    std::vector<float> attitudeDif;
+    std::vector<double> attitude;
+    std::vector<double> attitudeDif;
 
 private:
     std::vector<long> timestamps;
     std::vector<long> imu_timestamps;
 
-    std::vector<float> acc_x, acc_y, acc_z, ang_vel_x, ang_vel_y, ang_vel_z, quat_x, quat_y, quat_z, quat_w;
+    std::vector<double> acc_x, acc_y, acc_z, ang_vel_x, ang_vel_y, ang_vel_z, quat_x, quat_y, quat_z, quat_w;
 
     long imu_index = 0;
     long previousTimeDif = INT_MAX;

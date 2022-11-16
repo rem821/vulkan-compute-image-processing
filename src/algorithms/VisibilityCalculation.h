@@ -7,14 +7,15 @@
 #include "opencv4/opencv2/opencv.hpp"
 #include "../util/polyfit.h"
 
-void calculateVisibility(const int frameIndex, const cv::Mat &cameraFrame, const std::vector<float> &headingDif,
-                         const std::vector<float> &attitudeDif, std::pair<int, int> &vanishingPoint,
-                         std::vector<float> &visibilityCoeffs, std::vector<float> &visibility) {
-    Timer timer("Calculating DFT window");
+void calculateVisibility(const int frameIndex, const cv::Mat &cameraFrame, const std::vector<double> &headingDif,
+                         const std::vector<double> &attitudeDif, std::pair<int, int> &vanishingPoint,
+                         std::vector<double> &visibilityCoeffs, std::vector<double> &visibility) {
 
     // Estimate position of the road vanishing point
-    int32_t r_vp_x = cameraFrame.cols / 2 + int32_t(HORIZONTAL_SENSITIVITY * headingDif[headingDif.size() - 1]);
-    int32_t r_vp_y = cameraFrame.rows / 2 + int32_t(VERTICAL_SENSITIVITY * attitudeDif[attitudeDif.size() - 1]);
+    int32_t r_vp_x = (cameraFrame.cols / 2 + int32_t(HORIZONTAL_SENSITIVITY * headingDif[headingDif.size() - 1]) +
+                      HORIZONTAL_OFFSET);
+    int32_t r_vp_y = (cameraFrame.rows / 2 + int32_t(VERTICAL_SENSITIVITY * attitudeDif[attitudeDif.size() - 1]) +
+                      VERTICAL_OFFSET);
     vanishingPoint = std::pair(r_vp_x, r_vp_y);
 
     int32_t window_top_left_x = r_vp_x - (DFT_WINDOW_SIZE / 2);
@@ -82,7 +83,19 @@ void calculateVisibility(const int frameIndex, const cv::Mat &cameraFrame, const
         }
     }
 
-    cout << frameIndex << endl;
+    std::vector<double> coeffs(3);
+    polyfit(freq, pss, coeffs, 2);
+    visibilityCoeffs.push_back(coeffs[0]);
+    if (visibility.empty()) visibility.push_back(1);
+    else
+        visibility.push_back(
+                (1.0 - MOVING_AVERAGE_FORGET_RATE) * visibility[visibility.size() - 1] +
+                MOVING_AVERAGE_FORGET_RATE * (1 - (MAX_VISIBILITY_THRESHOLD -
+                                                   min(MAX_VISIBILITY_THRESHOLD,
+                                                       max(MIN_VISIBILITY_THRESHOLD, coeffs[0]))) /
+                                                  (MAX_VISIBILITY_THRESHOLD -
+                                                   MIN_VISIBILITY_THRESHOLD)));
+
     /*
     cout << "PSS = [ ";
     for (int i = 0; i < intMagINormPolar.cols; i++) {
@@ -97,26 +110,19 @@ void calculateVisibility(const int frameIndex, const cv::Mat &cameraFrame, const
         cout << " ";
     }
     cout << " ]" << endl;
-    */
-    std::vector<double> coeffs(3);
-    polyfit(freq, pss, coeffs, 2);
-    visibilityCoeffs.push_back(coeffs[0]);
-    if (visibility.empty()) visibility.push_back(1);
-    else
-        visibility.push_back(
-                0.9 * visibility[visibility.size() - 1] + 0.1 * (4000.0 - min(4000.0, max(3400.0, coeffs[0]))) / 600.0);
 
     cout << "VisibilityCoeffs = [ ";
-    for (float visibilityCoeff : visibilityCoeffs) {
+    for (float visibilityCoeff: visibilityCoeffs) {
         cout << visibilityCoeff;
         cout << " ";
     }
     cout << " ]" << endl;
 
     cout << "Visibility = [ ";
-    for (float i : visibility) {
+    for (float i: visibility) {
         cout << i;
         cout << " ";
     }
     cout << " ]" << endl;
+    */
 }

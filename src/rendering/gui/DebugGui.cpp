@@ -1,4 +1,5 @@
 #include "DebugGui.h"
+#include <numeric>
 
 DebugGui::DebugGui(VulkanEngineDevice &engineDevice, VulkanEngineRenderer &renderer, SDL_Window *window) {
     imguiPool = VulkanEngineDescriptorPool::Builder(engineDevice)
@@ -18,6 +19,7 @@ DebugGui::DebugGui(VulkanEngineDevice &engineDevice, VulkanEngineRenderer &rende
             .build();
 
     ImGui::CreateContext();
+    ImPlot::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
     (void) io;
     ImGui::StyleColorsDark();
@@ -52,7 +54,7 @@ DebugGui::~DebugGui() {
     ImGui_ImplVulkan_Shutdown();
 }
 
-void DebugGui::showWindow(SDL_Window *window, long frameIndex) {
+void DebugGui::showWindow(SDL_Window *window, long frameIndex, const std::vector<double>& visibility) {
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplSDL2_NewFrame(window);
 
@@ -78,16 +80,26 @@ void DebugGui::showWindow(SDL_Window *window, long frameIndex) {
     }
 
     // Frame index
-    ImGui::Text("Frame: %ld", frameIndex);
+    ImGui::TextColored(ImVec4(1,0,0,1), "Frame: %ld", frameIndex);
 
     // Running time, Frame time and FPS (Moving Average)
 
-    ImGui::Text("Running time: %f s", ImGui::GetTime());
+    ImGui::TextColored(ImVec4(1,0,0,1), "Running time: %f s", ImGui::GetTime());
     double frameTime = (ImGui::GetTime() - lastFrameTimestamp) * 1000;
-    ImGui::Text("Frame time: %f ms", frameTime);
+    ImGui::TextColored(ImVec4(1,0,0,1), "Frame time: %f ms", frameTime);
     movingFPSAverage = (0.08f * (1000.0f / frameTime)) + (1.0f - 0.08f) * movingFPSAverage;
-    ImGui::Text("FPS: %f", movingFPSAverage);
+    ImGui::TextColored(ImVec4(1,0,0,1), "FPS: %f", movingFPSAverage);
     lastFrameTimestamp = ImGui::GetTime();
+
+    std::vector<double> x(frameIndex);
+    std::iota (std::begin(x), std::end(x), 0);
+    if(ImPlot::BeginPlot("##Visibility")) {
+        ImPlot::SetupAxis(ImAxis_X1, "Frame", ImPlotAxisFlags_AutoFit);
+        ImPlot::SetupAxis(ImAxis_Y1, "Visibility", ImPlotAxisFlags_AutoFit);
+
+        ImPlot::PlotLine("", x.data(), visibility.data(), int(frameIndex), ImPlotLineFlags_NoClip);
+        ImPlot::EndPlot();
+    }
 
     ImGui::End();
 

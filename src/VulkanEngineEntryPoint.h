@@ -37,6 +37,10 @@ public:
     } uboVertexShader;
 
     struct {
+        glm::vec3 vanishingPoint;
+    } uboFragmentShader;
+
+    struct {
         glm::int32_t groupCount;
         glm::int32_t imageWidth;
         glm::int32_t imageHeight;
@@ -65,31 +69,46 @@ public:
     };
 
     VulkanEngineEntryPoint();
+
     ~VulkanEngineEntryPoint() = default;
 
     void prepareInputImage();
-    static bool loadImageFromFile(const std::string &file, void *pixels, size_t &size, int &width, int &height, int &channels);
+
+    static bool
+    loadImageFromFile(const std::string &file, void *pixels, size_t &size, int &width, int &height, int &channels);
+
     void generateQuad();
+
     void setupVertexDescriptions();
-    void prepareVertexUniformBuffer();
-    void updateVertexUniformBuffer();
+
+    void prepareGraphicsUniformBuffers();
+
+    void updateGraphicsUniformBuffers();
+
     void setupDescriptorSetLayout();
+
     void prepareGraphicsPipeline();
+
     void setupDescriptorPool();
+
     void setupDescriptorSet();
+
     void prepareCompute();
 
     void updateComputeDescriptorSets();
+
     void updateGraphicsDescriptorSets();
 
-    void setImuPose(std::vector<float> &heading, std::vector<float> &headingDif, std::vector<float> &attitude, std::vector<float> &attitudeDif) {
-        this->heading = heading;
-        this->headingDif = headingDif;
-        this->attitude = attitude;
-        this->attitudeDif = attitudeDif;
+    void setImuPose(std::vector<double> &_heading, std::vector<double> &_headingDif, std::vector<double> &_attitude,
+                    std::vector<double> &_attitudeDif) {
+        heading = _heading;
+        headingDif = _headingDif;
+        attitude = _attitude;
+        attitudeDif = _attitudeDif;
     }
 
     void render();
+
     void handleEvents();
 
     void saveScreenshot(const char *filename);
@@ -99,17 +118,23 @@ public:
 private:
 
     VkPipelineShaderStageCreateInfo loadShader(std::string fileName, VkShaderStageFlagBits stage);
+
     VkShaderModule loadShaderModule(const char *fileName, VkDevice device);
 
-    void prepareComputePipeline(std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings, const std::string &shaderName);
+    void
+    prepareComputePipeline(std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings, const std::string &shaderName);
 
-    VulkanEngineWindow window{WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE};
+    VulkanEngineWindow window{WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT,
+                              SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE};
     VulkanEngineDevice engineDevice{window, WINDOW_TITLE};
     VulkanEngineRenderer renderer{window, engineDevice};
     Camera camera{};
-    DebugGui debugGui{engineDevice, renderer, window.sdlWindow()};
 
-    cv::VideoCapture video{VIDEO_PATH};
+#if DEBUG_GUI_ENABLED
+    DebugGui debugGui{engineDevice, renderer, window.sdlWindow()};
+#endif
+
+    cv::VideoCapture video{std::string(SESSION_PATH) + std::string(VIDEO_PATH)};
     double lastReadFrame = -1;
     double totalFrames = video.get(cv::CAP_PROP_FRAME_COUNT);
 
@@ -123,7 +148,7 @@ private:
     std::unique_ptr<VulkanEngineBuffer> indexBuffer;
 
     std::unique_ptr<VulkanEngineBuffer> uniformBufferVertexShader;
-    std::unique_ptr<VulkanEngineBuffer> uniformBufferComputeShader;
+    std::unique_ptr<VulkanEngineBuffer> uniformBufferFragmentShader;
     std::unique_ptr<VulkanEngineBuffer> airLightGroupsBuffer;
     std::unique_ptr<VulkanEngineBuffer> airLightMaxBuffer;
 
@@ -143,16 +168,16 @@ private:
     cv::Mat cameraFrame;
     cv::Mat cameraWindowFrame;
     // IMU Pose
-    std::vector<float> heading;
-    std::vector<float> headingDif;
+    std::vector<double> heading;
+    std::vector<double> headingDif;
 
-    std::vector<float> attitude;
-    std::vector<float> attitudeDif;
+    std::vector<double> attitude;
+    std::vector<double> attitudeDif;
 
     // Visibility calculation
     std::pair<int, int> vanishingPoint;
-    std::vector<float> visibilityCoeffs;
-    std::vector<float> visibility;
+    std::vector<double> visibilityCoeffs;
+    std::vector<double> visibility;
 };
 
 

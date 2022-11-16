@@ -12,8 +12,11 @@
 
 class VulkanEngineSwapChain {
 public:
+#if DEBUG_GUI_ENABLED
     static constexpr int MAX_FRAMES_IN_FLIGHT = 3;
-
+#else
+    static constexpr int MAX_FRAMES_IN_FLIGHT = 1;
+#endif
     VulkanEngineSwapChain(VulkanEngineDevice &engineDevice, VkExtent2D extent);
     VulkanEngineSwapChain(VulkanEngineDevice &engineDevice, VkExtent2D extent,
                           std::shared_ptr<VulkanEngineSwapChain> previous);

@@ -11,6 +11,7 @@
 #include "SDL.h"
 #include "imgui_impl_sdl.h"
 #include "imgui_impl_vulkan.h"
+#include "../../external/imgui/implot.h"
 
 #include <vector>
 #include <chrono>
@@ -18,15 +19,19 @@
 class DebugGui {
 public:
     DebugGui(VulkanEngineDevice &engineDevice, VulkanEngineRenderer &renderer, SDL_Window *window);
+
     ~DebugGui();
 
     DebugGui(const DebugGui &) = delete;
+
     DebugGui &operator=(const DebugGui &) = delete;
 
-    void showWindow(SDL_Window *window, long frameIndex);
+    void showWindow(SDL_Window *window, long frameIndex, const std::vector<double> &visibility);
 
-    void render(VkCommandBuffer &commandBuffer);
-    void processEvent(SDL_Event event);
+    static void render(VkCommandBuffer &commandBuffer);
+
+    static void processEvent(SDL_Event event);
+
 private:
     double lastFrameTimestamp = 0;
     double movingFPSAverage = 0;

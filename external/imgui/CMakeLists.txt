@@ -10,7 +10,10 @@ set(IMGUI_SOURCE
         ${CMAKE_CURRENT_SOURCE_DIR}/imgui_draw.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/imgui_tables.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/imgui_widgets.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/imgui_demo.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/implot.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/implot.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/implot_internal.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/implot_items.cpp
         )
 
 add_library(ImGui ${IMGUI_SOURCE})
