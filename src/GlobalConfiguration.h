@@ -32,7 +32,7 @@
 
 // Content section
 #define VIDEO_DOWNSCALE_FACTOR 1
-#define SESSION_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_4_2/"
+#define SESSION_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_2/"
 #define IMAGE_PATH "../assets/image.jpg"
 
 // Shaders section
@@ -59,8 +59,7 @@
 #define WINDOW_WIDTH 1920
 #define WINDOW_HEIGHT 1200
 
-#define PLAY_VIDEO true
-#define SINGLE_VIEW_MODE true
+#define SINGLE_VIEW_MODE false
 
 #define SWEEP_FRAMES 40
 
@@ -91,11 +90,11 @@
 #define MOVING_AVERAGE_FORGET_RATE 0.05
 
 // Debugging section
-#define TIMER_ON true
+#define TIMER_ON false
 #define RENDERDOC_ENABLED false
 #define DEBUG_GUI_ENABLED true
 
-//we want to immediately abort when there is an error. In normal engines this would give an error message to the user, or perform a dump of state.
+// We want to immediately abort when there is an error. In normal engines this would give an error message to the user, or perform a dump of state.
 using namespace std;
 #define VK_CHECK(x)                                                     \
     do                                                                  \

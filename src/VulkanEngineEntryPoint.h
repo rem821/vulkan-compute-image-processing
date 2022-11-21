@@ -34,11 +34,11 @@ public:
     struct {
         glm::mat4 projection;
         glm::mat4 modelView;
-    } uboVertexShader;
+    } uboVertexShader{};
 
     struct {
         glm::vec3 vanishingPoint;
-    } uboFragmentShader;
+    } uboFragmentShader{};
 
     struct {
         glm::int32_t groupCount;
@@ -46,7 +46,7 @@ public:
         glm::int32_t imageHeight;
         glm::float32_t omega;
         alignas(32) glm::float32_t epsilon;
-    } computePushConstant;
+    } computePushConstant{};
 
     struct {
         VkDescriptorSetLayout descriptorSetLayout;
@@ -59,7 +59,7 @@ public:
 
         VkPipeline pipeline;
         VkPipelineLayout pipelineLayout;
-    } graphics;
+    } graphics{};
 
     struct Compute {
         VkDescriptorSetLayout descriptorSetLayout;
@@ -73,9 +73,6 @@ public:
     ~VulkanEngineEntryPoint() = default;
 
     void prepareInputImage();
-
-    static bool
-    loadImageFromFile(const std::string &file, void *pixels, size_t &size, int &width, int &height, int &channels);
 
     void generateQuad();
 
@@ -117,9 +114,9 @@ public:
     uint32_t frameIndex = 0;
 private:
 
-    VkPipelineShaderStageCreateInfo loadShader(std::string fileName, VkShaderStageFlagBits stage);
+    VkPipelineShaderStageCreateInfo loadShader(const std::string& fileName, VkShaderStageFlagBits stage);
 
-    VkShaderModule loadShaderModule(const char *fileName, VkDevice device);
+    static VkShaderModule loadShaderModule(const char *fileName, VkDevice device);
 
     void
     prepareComputePipeline(std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings, const std::string &shaderName);
@@ -138,11 +135,11 @@ private:
     double lastReadFrame = -1;
     double totalFrames = video.get(cv::CAP_PROP_FRAME_COUNT);
 
-    Texture2D inputTexture;
-    Texture2D darkChannelPriorTexture;
-    Texture2D transmissionTexture;
-    Texture2D filteredTransmissionTexture;
-    Texture2D radianceTexture;
+    Texture2D inputTexture{};
+    Texture2D darkChannelPriorTexture{};
+    Texture2D transmissionTexture{};
+    Texture2D filteredTransmissionTexture{};
+    Texture2D radianceTexture{};
 
     std::unique_ptr<VulkanEngineBuffer> vertexBuffer;
     std::unique_ptr<VulkanEngineBuffer> indexBuffer;
@@ -158,9 +155,9 @@ private:
 
     VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
 
-    uint32_t indexCount;
+    uint32_t indexCount{};
 
-    glm::vec2 mouseDragOrigin;
+    glm::vec2 mouseDragOrigin{};
     float zoom = 0.0f;
     glm::vec2 panPosition = glm::vec2(0.0f, 0.0f);
 

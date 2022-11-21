@@ -28,9 +28,9 @@ public:
 
     void showWindow(SDL_Window *window, long frameIndex, const std::vector<double> &visibility);
 
-    static void render(VkCommandBuffer &commandBuffer);
+    void render(VkCommandBuffer &commandBuffer);
 
-    static void processEvent(SDL_Event event);
+    void processEvent(SDL_Event event);
 
 private:
     double lastFrameTimestamp = 0;

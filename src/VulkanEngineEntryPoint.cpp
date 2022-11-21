@@ -57,7 +57,7 @@ VulkanEngineEntryPoint::VulkanEngineEntryPoint() {
 
 void VulkanEngineEntryPoint::prepareInputImage() {
 
-    if (PLAY_VIDEO && frameIndex < totalFrames) {
+    if (frameIndex < totalFrames) {
         {
             Timer timer("Reading next video frame");
             while (lastReadFrame < frameIndex) {
@@ -68,7 +68,7 @@ void VulkanEngineEntryPoint::prepareInputImage() {
 
         if (!heading.empty()) {
             Timer timer("Calculating visibility");
-            calculateVisibility(frameIndex, cameraFrame, headingDif, attitudeDif, vanishingPoint, visibilityCoeffs,
+            calculateVisibility(int(frameIndex), cameraFrame, headingDif, attitudeDif, vanishingPoint, visibilityCoeffs,
                                 visibility);
 
             vanishingPoint.first = int(
@@ -90,38 +90,7 @@ void VulkanEngineEntryPoint::prepareInputImage() {
                                        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
                                        VK_IMAGE_LAYOUT_GENERAL);
         }
-
-    } else {
-        size_t size;
-        int32_t width, height, channels;
-        loadImageFromFile(IMAGE_PATH, nullptr, size, width, height, channels);
-
-        auto *pixels = new int8_t[size];
-        loadImageFromFile(IMAGE_PATH, pixels, size, width, height, channels);
-
-        inputTexture.fromImageFile(pixels, size, VK_FORMAT_R8G8B8A8_UNORM, width, height, engineDevice,
-                                   engineDevice.graphicsQueue(), VK_FILTER_LINEAR,
-                                   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-                                   VK_IMAGE_LAYOUT_GENERAL);
-
-        delete[] pixels;
     }
-}
-
-bool VulkanEngineEntryPoint::loadImageFromFile(const std::string &file, void *pixels, size_t &size, int &width,
-                                               int &height, int &channels) {
-    stbi_uc *px = stbi_load(file.c_str(), &width, &height, nullptr, STBI_rgb_alpha);
-
-    channels = 4;
-    size = width * height * channels;
-    if (!pixels) return false;
-    if (!px) {
-        std::cout << "Failed to load texture file " << file << std::endl;
-        return false;
-    }
-    memcpy(pixels, px, size * sizeof(int8_t));
-
-    return true;
 }
 
 void VulkanEngineEntryPoint::generateQuad() {
@@ -647,201 +616,198 @@ void VulkanEngineEntryPoint::render() {
 #if DEBUG_GUI_ENABLED
         debugGui.showWindow(window.sdlWindow(), frameIndex, visibility);
 #endif
-        if (PLAY_VIDEO || frameIndex == 0) {
-            // First ComputeShader call -> calculate DarkChannelPrior + maxAirLight channels for each workgroup
-            {
-                vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                  compute.at(0).pipeline);
-                vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                        compute.at(0).pipelineLayout,
-                                        0, 1, &compute.at(0).descriptorSet, 0,
-                                        nullptr);
 
-                vkCmdPushConstants(bufferPair.computeCommandBuffer, compute.at(0).pipelineLayout,
-                                   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(computePushConstant), &computePushConstant);
-                vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
-            }
+        // First ComputeShader call -> Calculate DarkChannelPrior + maxAirLight channels for each workgroup
+        {
+            vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                              compute.at(0).pipeline);
+            vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                    compute.at(0).pipelineLayout,
+                                    0, 1, &compute.at(0).descriptorSet, 0,
+                                    nullptr);
 
-            // Wait
-            vkCmdPipelineBarrier(bufferPair.computeCommandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                                 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 0, nullptr);
-
-            // Second ComputeShader call -> Calculate maximum airLight channels on a single thread
-            {
-                vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                  compute.at(1).pipeline);
-                vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                        compute.at(1).pipelineLayout,
-                                        0, 1, &compute.at(1).descriptorSet, 0,
-                                        nullptr);
-                vkCmdPushConstants(bufferPair.computeCommandBuffer, compute.at(1).pipelineLayout,
-                                   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(computePushConstant), &computePushConstant);
-                vkCmdDispatch(bufferPair.computeCommandBuffer, 1, 1, 1);
-            }
-
-            // Wait
-            vkCmdPipelineBarrier(bufferPair.computeCommandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                                 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 0, nullptr);
-
-            // Third ComputeShader call -> calculate transmission
-            {
-                vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                  compute.at(2).pipeline);
-                vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                        compute.at(2).pipelineLayout,
-                                        0, 1, &compute.at(2).descriptorSet, 0,
-                                        nullptr);
-                vkCmdPushConstants(bufferPair.computeCommandBuffer, compute.at(2).pipelineLayout,
-                                   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(computePushConstant), &computePushConstant);
-                vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
-            }
-
-            // Wait
-            vkCmdPipelineBarrier(bufferPair.computeCommandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                                 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 0, nullptr);
-
-            // Fourth ComputeShader call -> Refine transmission with Guided filter
-            {
-                vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                  compute.at(3).pipeline);
-                vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                        compute.at(3).pipelineLayout,
-                                        0, 1, &compute.at(3).descriptorSet, 0,
-                                        nullptr);
-                vkCmdPushConstants(bufferPair.computeCommandBuffer, compute.at(3).pipelineLayout,
-                                   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(computePushConstant), &computePushConstant);
-                vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
-            }
-
-            // Wait
-            vkCmdPipelineBarrier(bufferPair.computeCommandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                                 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 0, nullptr);
-
-            // Fifth ComputeShader call -> calculate radiance
-            {
-                vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                  compute.at(4).pipeline);
-                vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                        compute.at(4).pipelineLayout,
-                                        0, 1, &compute.at(4).descriptorSet, 0,
-                                        nullptr);
-
-                vkCmdPushConstants(bufferPair.computeCommandBuffer, compute.at(4).pipelineLayout,
-                                   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(computePushConstant),
-                                   &computePushConstant);
-                vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
-            }
+            vkCmdPushConstants(bufferPair.computeCommandBuffer, compute.at(0).pipelineLayout,
+                               VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(computePushConstant), &computePushConstant);
+            vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
         }
+
+        // Wait
+        vkCmdPipelineBarrier(bufferPair.computeCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 0, nullptr);
+
+        // Second ComputeShader call -> Calculate maximum airLight channels on a single thread
+        {
+            vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                              compute.at(1).pipeline);
+            vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                    compute.at(1).pipelineLayout,
+                                    0, 1, &compute.at(1).descriptorSet, 0,
+                                    nullptr);
+            vkCmdPushConstants(bufferPair.computeCommandBuffer, compute.at(1).pipelineLayout,
+                               VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(computePushConstant), &computePushConstant);
+            vkCmdDispatch(bufferPair.computeCommandBuffer, 1, 1, 1);
+        }
+
+        // Wait
+        vkCmdPipelineBarrier(bufferPair.computeCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 0, nullptr);
+
+        // Third ComputeShader call -> Calculate transmission
+        {
+            vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                              compute.at(2).pipeline);
+            vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                    compute.at(2).pipelineLayout,
+                                    0, 1, &compute.at(2).descriptorSet, 0,
+                                    nullptr);
+            vkCmdPushConstants(bufferPair.computeCommandBuffer, compute.at(2).pipelineLayout,
+                               VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(computePushConstant), &computePushConstant);
+            vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
+        }
+
+        // Wait
+        vkCmdPipelineBarrier(bufferPair.computeCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 0, nullptr);
+
+        // Fourth ComputeShader call -> Refine transmission with Guided filter
+        {
+            vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                              compute.at(3).pipeline);
+            vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                    compute.at(3).pipelineLayout,
+                                    0, 1, &compute.at(3).descriptorSet, 0,
+                                    nullptr);
+            vkCmdPushConstants(bufferPair.computeCommandBuffer, compute.at(3).pipelineLayout,
+                               VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(computePushConstant), &computePushConstant);
+            vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
+        }
+
+        // Wait
+        vkCmdPipelineBarrier(bufferPair.computeCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 0, nullptr);
+
+        // Fifth ComputeShader call -> calculate radiance
+        {
+            vkCmdBindPipeline(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                              compute.at(4).pipeline);
+            vkCmdBindDescriptorSets(bufferPair.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                    compute.at(4).pipelineLayout,
+                                    0, 1, &compute.at(4).descriptorSet, 0,
+                                    nullptr);
+
+            vkCmdPushConstants(bufferPair.computeCommandBuffer, compute.at(4).pipelineLayout,
+                               VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(computePushConstant),
+                               &computePushConstant);
+            vkCmdDispatch(bufferPair.computeCommandBuffer, WORKGROUP_COUNT, WORKGROUP_COUNT, 1);
+        }
+
+        VkMemoryBarrier memoryBarrier = {};
+        memoryBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+        memoryBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        memoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        // Wait
+        vkCmdPipelineBarrier(bufferPair.computeCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                             VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
 
         renderer.beginSwapChainRenderPass(bufferPair.graphicsCommandBuffer, radianceTexture.image);
         // Record graphics commandBuffer
-        if (SINGLE_VIEW_MODE) {
-            float preWidth = renderer.getEngineSwapChain()->getSwapChainExtent().width;
-            float preHeight = renderer.getEngineSwapChain()->getSwapChainExtent().height;
+#if SINGLE_VIEW_MODE
+        float preWidth = renderer.getEngineSwapChain()->getSwapChainExtent().width;
+        float preHeight = renderer.getEngineSwapChain()->getSwapChainExtent().height;
 
-            VkViewport viewport = {};
-            viewport.x = panPosition.x;
-            viewport.y = panPosition.y;
-            viewport.width = preWidth;
-            viewport.height = preHeight;
-            viewport.minDepth = 0.0f;
-            viewport.maxDepth = 1.0f;
-            VkRect2D scissor{{0, 0}, renderer.getEngineSwapChain()->getSwapChainExtent()};
+        VkViewport viewport = {};
+        viewport.x = panPosition.x;
+        viewport.y = panPosition.y;
+        viewport.width = preWidth;
+        viewport.height = preHeight;
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        VkRect2D scissor{{0, 0}, renderer.getEngineSwapChain()->getSwapChainExtent()};
 
-            vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
-            vkCmdSetScissor(bufferPair.graphicsCommandBuffer, 0, 1, &scissor);
+        vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
+        vkCmdSetScissor(bufferPair.graphicsCommandBuffer, 0, 1, &scissor);
 
-            VkDeviceSize offsets[1] = {0};
-            vkCmdBindVertexBuffers(bufferPair.graphicsCommandBuffer, 0, 1, vertexBuffer->getBuffer(), offsets);
-            vkCmdBindIndexBuffer(bufferPair.graphicsCommandBuffer, *indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+        VkDeviceSize offsets[1] = {0};
+        vkCmdBindVertexBuffers(bufferPair.graphicsCommandBuffer, 0, 1, vertexBuffer->getBuffer(), offsets);
+        vkCmdBindIndexBuffer(bufferPair.graphicsCommandBuffer, *indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
-            vkCmdBindPipeline(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
+        vkCmdBindPipeline(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
 
-            vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    graphics.pipelineLayout, 0, 1,
-                                    &graphics.descriptorSetPreCompute, 0, nullptr);
+        vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                graphics.pipelineLayout, 0, 1,
+                                &graphics.descriptorSetPreCompute, 0, nullptr);
 
-            vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
-        } else {
-            // Render first half of the screen
-            float preWidth = renderer.getEngineSwapChain()->getSwapChainExtent().width * 0.5f + zoom;
-            float preHeight = (preWidth / inputTexture.width) * inputTexture.height;
+        vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
+#else
+        // Render first half of the screen
+        float preWidth = float(renderer.getEngineSwapChain()->getSwapChainExtent().width) * 0.5f + zoom;
+        float preHeight = (preWidth / float(inputTexture.width)) * float(inputTexture.height);
 
-            VkViewport viewport = {};
-            viewport.x = panPosition.x;
-            viewport.y = panPosition.y;
-            viewport.width = preWidth;
-            viewport.height = preHeight;
-            viewport.minDepth = 0.0f;
-            viewport.maxDepth = 1.0f;
-            VkRect2D scissor{{0, 0}, renderer.getEngineSwapChain()->getSwapChainExtent()};
+        VkViewport viewport = {};
+        viewport.x = panPosition.x;
+        viewport.y = panPosition.y;
+        viewport.width = preWidth;
+        viewport.height = preHeight;
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        VkRect2D scissor{{0, 0}, renderer.getEngineSwapChain()->getSwapChainExtent()};
 
-            vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
-            vkCmdSetScissor(bufferPair.graphicsCommandBuffer, 0, 1, &scissor);
+        vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
+        vkCmdSetScissor(bufferPair.graphicsCommandBuffer, 0, 1, &scissor);
 
-            VkDeviceSize offsets[1] = {0};
-            vkCmdBindVertexBuffers(bufferPair.graphicsCommandBuffer, 0, 1, vertexBuffer->getBuffer(), offsets);
-            vkCmdBindIndexBuffer(bufferPair.graphicsCommandBuffer, *indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+        VkDeviceSize offsets[1] = {0};
+        vkCmdBindVertexBuffers(bufferPair.graphicsCommandBuffer, 0, 1, vertexBuffer->getBuffer(), offsets);
+        vkCmdBindIndexBuffer(bufferPair.graphicsCommandBuffer, *indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
-            vkCmdBindPipeline(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
+        vkCmdBindPipeline(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.pipeline);
 
-            // Top Left (pre compute)
+        // Top Left (pre compute)
+        vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                graphics.pipelineLayout, 0, 1,
+                                &graphics.descriptorSetPreCompute, 0, nullptr);
 
-            vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    graphics.pipelineLayout, 0, 1,
-                                    &graphics.descriptorSetPreCompute, 0, nullptr);
+        vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
 
-            vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
+        // Top Right (final image)
+        vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                graphics.pipelineLayout, 0, 1,
+                                &graphics.descriptorSetPostComputeFinal, 0, nullptr);
 
-            // Top Right (final image)
-            vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    graphics.pipelineLayout, 0, 1,
-                                    &graphics.descriptorSetPostComputeFinal, 0, nullptr);
+        viewport.x = panPosition.x + preWidth;
+        vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
+        vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
 
-            viewport.x = panPosition.x + preWidth;
-            vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
-            vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
+        // Middle Left (compute first stage)
+        vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                graphics.pipelineLayout, 0, 1,
+                                &graphics.descriptorSetPostComputeStageOne, 0, nullptr);
 
-            // Middle Left (compute first stage)
-            vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    graphics.pipelineLayout, 0, 1,
-                                    &graphics.descriptorSetPostComputeStageOne, 0, nullptr);
+        viewport.x = panPosition.x;
+        viewport.y = panPosition.y + preHeight;
+        vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
+        vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
 
-            viewport.x = panPosition.x;
-            viewport.y = panPosition.y + preHeight;
-            vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
-            vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
+        // Middle Right (compute second stage)
+        vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                graphics.pipelineLayout, 0, 1,
+                                &graphics.descriptorSetPostComputeStageTwo, 0, nullptr);
 
-            // Middle Right (compute second stage)
-            vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    graphics.pipelineLayout, 0, 1,
-                                    &graphics.descriptorSetPostComputeStageTwo, 0, nullptr);
+        viewport.x = panPosition.x + preWidth;
+        viewport.y = panPosition.y + preHeight;
+        vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
+        vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
 
-            viewport.x = panPosition.x + preWidth;
-            viewport.y = panPosition.y + preHeight;
-            vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
-            vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
+        // Bottom Left (compute third stage)
+        vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                graphics.pipelineLayout, 0, 1,
+                                &graphics.descriptorSetPostComputeStageThree, 0, nullptr);
 
-            // Bottom Left (compute third stage)
-            vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    graphics.pipelineLayout, 0, 1,
-                                    &graphics.descriptorSetPostComputeStageThree, 0, nullptr);
-
-            viewport.x = panPosition.x;
-            viewport.y = panPosition.y + (preHeight * 2.0f);
-            vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
-            vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
-
-            // Bottom Right (final fourth stage)
-            vkCmdBindDescriptorSets(bufferPair.graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    graphics.pipelineLayout, 0, 1,
-                                    &graphics.descriptorSetPostComputeStageFour, 0, nullptr);
-
-            viewport.x = panPosition.x + preWidth;
-            viewport.y = panPosition.y + (preHeight * 2.0f);
-            vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
-            vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
-        }
+        viewport.x = panPosition.x;
+        viewport.y = panPosition.y + (preHeight * 2.0f);
+        vkCmdSetViewport(bufferPair.graphicsCommandBuffer, 0, 1, &viewport);
+        vkCmdDrawIndexed(bufferPair.graphicsCommandBuffer, indexCount, 1, 0, 0, 0);
+#endif
 
 #if DEBUG_GUI_ENABLED
         debugGui.render(bufferPair.graphicsCommandBuffer);
@@ -860,9 +826,9 @@ void VulkanEngineEntryPoint::render() {
 
         updateComputeDescriptorSets();
         updateGraphicsDescriptorSets();
-
-
+#if TIMER_ON
         fmt::print("--------------------------------------------------------------------------------------------\n");
+#endif
     }
 }
 
@@ -1345,8 +1311,8 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
     if (supportsBlit) {
         // Define the region to blit (we will blit the whole swapchain image)
         VkOffset3D blitSize;
-        blitSize.x = width;
-        blitSize.y = height;
+        blitSize.x = int(width);
+        blitSize.y = int(height);
         blitSize.z = 1;
         VkImageBlit imageBlitRegion{};
         imageBlitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -1422,7 +1388,7 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
         dataRgb[i + 3] = dataBgr[i + 3];
     }
 
-    stbi_write_png(filename, width, height, channels, dataRgb, 0);
+    stbi_write_png(filename, int(width), int(height), int(channels), dataRgb, 0);
 
     fmt::print("Screenshot saved to disk\n");
 
@@ -1433,7 +1399,7 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
     delete[] dataRgb;
 }
 
-VkPipelineShaderStageCreateInfo VulkanEngineEntryPoint::loadShader(std::string fileName, VkShaderStageFlagBits stage) {
+VkPipelineShaderStageCreateInfo VulkanEngineEntryPoint::loadShader(const std::string& fileName, VkShaderStageFlagBits stage) {
     VkPipelineShaderStageCreateInfo shaderStage = {};
     shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shaderStage.stage = stage;
@@ -1453,7 +1419,7 @@ VkShaderModule VulkanEngineEntryPoint::loadShaderModule(const char *fileName, Vk
         size_t size = is.tellg();
         is.seekg(0, std::ios::beg);
         char *shaderCode = new char[size];
-        is.read(shaderCode, size);
+        is.read(shaderCode, std::streamsize(size));
         is.close();
 
         assert(size > 0);
@@ -1515,8 +1481,8 @@ void VulkanEngineEntryPoint::handleEvents() {
                 }
             case SDL_MOUSEMOTION:
                 if (mouseDragOrigin != glm::vec2(0.0f, 0.0f)) {
-                    glm::vec2 difPos = glm::vec2(mouseDragOrigin.x - event.button.x,
-                                                 mouseDragOrigin.y - event.button.y);
+                    glm::vec2 difPos = glm::vec2(mouseDragOrigin.x - float(event.button.x),
+                                                 mouseDragOrigin.y - float(event.button.y));
 
                     panPosition += glm::vec2(-difPos.x, -difPos.y);
                     mouseDragOrigin = glm::vec2(event.button.x, event.button.y);
