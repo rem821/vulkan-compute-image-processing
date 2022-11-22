@@ -8,12 +8,12 @@
 //  1 --> Work PC (AMD Radeon card)
 //  2 --> Macbook Pro  16" 2019 (AMD Radeon card)
 
-#define DEVICE_TYPE 1
+#define DEVICE_TYPE 0
 
 #if DEVICE_TYPE == 0
 
 // Graphics setting section
-#define INTEGRATED_GRAPHICS true
+#define INTEGRATED_GRAPHICS false
 #define VALIDATION_LAYER_NAME "VK_LAYER_LUNARG_standard_validation"
 
 // Content section
@@ -59,7 +59,7 @@
 #define WINDOW_WIDTH 1920
 #define WINDOW_HEIGHT 1200
 
-#define SINGLE_VIEW_MODE false
+#define SINGLE_VIEW_MODE true
 
 #define SWEEP_FRAMES 40
 
