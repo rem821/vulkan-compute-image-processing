@@ -74,7 +74,7 @@ void VulkanEngineEntryPoint::prepareInputImage() {
                                 visibility);
 
 
-            detectGlare(cameraFrameGray, vanishingPoint, histograms);
+            detectGlare(cameraFrameGray, vanishingPoint, histograms, glareAmounts);
 
             vanishingPoint.first = int(
                     float(vanishingPoint.first) * (float(window.getExtent().width) / float(cameraFrame.cols)));
@@ -620,7 +620,7 @@ void VulkanEngineEntryPoint::render() {
         // Record compute command buffer
 
 #if DEBUG_GUI_ENABLED
-        debugGui.showWindow(window.sdlWindow(), frameIndex, visibility, histograms);
+        debugGui.showWindow(window.sdlWindow(), frameIndex, visibility, histograms, glareAmounts);
 #endif
 
         // First ComputeShader call -> Calculate DarkChannelPrior + maxAirLight channels for each workgroup

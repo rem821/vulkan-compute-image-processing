@@ -114,7 +114,7 @@ public:
     uint32_t frameIndex = 0;
 private:
 
-    VkPipelineShaderStageCreateInfo loadShader(const std::string& fileName, VkShaderStageFlagBits stage);
+    VkPipelineShaderStageCreateInfo loadShader(const std::string &fileName, VkShaderStageFlagBits stage);
 
     static VkShaderModule loadShaderModule(const char *fileName, VkDevice device);
 
@@ -177,7 +177,8 @@ private:
     std::vector<double> visibility;
 
     // Glare detection
-    cv::Mat histograms = cv::Mat(HISTOGRAM_COUNT, HISTOGRAM_BINS, CV_32FC1, cv::Scalar(0));
+    cv::Mat histograms = cv::Mat(HISTOGRAM_COUNT * HISTOGRAM_COUNT, HISTOGRAM_BINS, CV_32FC1, cv::Scalar(0));
+    cv::Mat glareAmounts = cv::Mat(HISTOGRAM_COUNT, HISTOGRAM_COUNT, CV_32FC1, cv::Scalar(0.0f));
 };
 
 

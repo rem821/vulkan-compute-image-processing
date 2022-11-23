@@ -32,7 +32,7 @@
 
 // Content section
 #define VIDEO_DOWNSCALE_FACTOR 1
-#define SESSION_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_4_2/"
+#define SESSION_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_2/"
 #define IMAGE_PATH "../assets/image.jpg"
 
 // Shaders section
@@ -90,8 +90,9 @@
 #define MOVING_AVERAGE_FORGET_RATE 0.05
 
 // GLARE DETECTION
-#define HISTOGRAM_COUNT 25
+#define HISTOGRAM_COUNT 10
 #define HISTOGRAM_BINS 32
+#define GLARE_THRESHOLD 0.8
 
 // Debugging section
 #define TIMER_ON true

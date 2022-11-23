@@ -27,7 +27,9 @@ public:
 
     DebugGui &operator=(const DebugGui &) = delete;
 
-    void showWindow(SDL_Window *window, long frameIndex, const std::vector<double> &visibility, const cv::Mat& histograms);
+    void
+    showWindow(SDL_Window *window, long frameIndex, const std::vector<double> &visibility, const cv::Mat &histograms,
+               const cv::Mat &glareAmounts);
 
     void render(VkCommandBuffer &commandBuffer);
 
