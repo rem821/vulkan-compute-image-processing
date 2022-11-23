@@ -12,6 +12,7 @@
 #include "imgui_impl_sdl.h"
 #include "imgui_impl_vulkan.h"
 #include "../../external/imgui/implot.h"
+#include "opencv4/opencv2/opencv.hpp"
 
 #include <vector>
 #include <chrono>
@@ -26,7 +27,7 @@ public:
 
     DebugGui &operator=(const DebugGui &) = delete;
 
-    void showWindow(SDL_Window *window, long frameIndex, const std::vector<double> &visibility);
+    void showWindow(SDL_Window *window, long frameIndex, const std::vector<double> &visibility, const cv::Mat& histograms);
 
     void render(VkCommandBuffer &commandBuffer);
 

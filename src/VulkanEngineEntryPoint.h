@@ -175,6 +175,9 @@ private:
     std::pair<int, int> vanishingPoint;
     std::vector<double> visibilityCoeffs;
     std::vector<double> visibility;
+
+    // Glare detection
+    cv::Mat histograms = cv::Mat(HISTOGRAM_COUNT, HISTOGRAM_BINS, CV_32FC1, cv::Scalar(0));
 };
 
 

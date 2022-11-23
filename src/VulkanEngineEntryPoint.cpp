@@ -9,6 +9,7 @@
 #include "../external/stb/stb_image.h"
 #include "../external/stb/stb_image_write.h"
 #include "algorithms/VisibilityCalculation.h"
+#include "algorithms/GlareDetection.h"
 #include <vulkan/vulkan.hpp>
 #include <fmt/core.h>
 #include <vector>
@@ -67,14 +68,19 @@ void VulkanEngineEntryPoint::prepareInputImage() {
         }
 
         if (!heading.empty()) {
-            Timer timer("Calculating visibility");
-            calculateVisibility(int(frameIndex), cameraFrame, headingDif, attitudeDif, vanishingPoint, visibilityCoeffs,
+            cv::Mat cameraFrameGray;
+            cv::cvtColor(cameraFrame, cameraFrameGray, cv::COLOR_BGR2GRAY);
+            calculateVisibility(int(frameIndex), cameraFrameGray, headingDif, attitudeDif, vanishingPoint, visibilityCoeffs,
                                 visibility);
+
+
+            detectGlare(cameraFrameGray, vanishingPoint, histograms);
 
             vanishingPoint.first = int(
                     float(vanishingPoint.first) * (float(window.getExtent().width) / float(cameraFrame.cols)));
             vanishingPoint.second = int(
                     float(vanishingPoint.second) * (float(window.getExtent().height) / float(cameraFrame.rows)));
+
         }
 
         {
@@ -614,7 +620,7 @@ void VulkanEngineEntryPoint::render() {
         // Record compute command buffer
 
 #if DEBUG_GUI_ENABLED
-        debugGui.showWindow(window.sdlWindow(), frameIndex, visibility);
+        debugGui.showWindow(window.sdlWindow(), frameIndex, visibility, histograms);
 #endif
 
         // First ComputeShader call -> Calculate DarkChannelPrior + maxAirLight channels for each workgroup

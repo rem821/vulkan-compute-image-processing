@@ -54,7 +54,8 @@ DebugGui::~DebugGui() {
     ImGui_ImplVulkan_Shutdown();
 }
 
-void DebugGui::showWindow(SDL_Window *window, long frameIndex, const std::vector<double>& visibility) {
+void DebugGui::showWindow(SDL_Window *window, long frameIndex, const std::vector<double> &visibility,
+                          const cv::Mat &histograms) {
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplSDL2_NewFrame(window);
 
@@ -69,7 +70,8 @@ void DebugGui::showWindow(SDL_Window *window, long frameIndex, const std::vector
     window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus;
 
     const ImGuiViewport *main_viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(ImVec2(main_viewport->WorkPos.x + 650, main_viewport->WorkPos.y + 20), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2(main_viewport->WorkPos.x + 650, main_viewport->WorkPos.y + 20),
+                            ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(550, 680), ImGuiCond_FirstUseEver);
 
 
@@ -80,24 +82,32 @@ void DebugGui::showWindow(SDL_Window *window, long frameIndex, const std::vector
     }
 
     // Frame index
-    ImGui::TextColored(ImVec4(1,0,0,1), "Frame: %ld", frameIndex);
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Frame: %ld", frameIndex);
 
     // Running time, Frame time and FPS (Moving Average)
 
-    ImGui::TextColored(ImVec4(1,0,0,1), "Running time: %f s", ImGui::GetTime());
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Running time: %f s", ImGui::GetTime());
     double frameTime = (ImGui::GetTime() - lastFrameTimestamp) * 1000;
-    ImGui::TextColored(ImVec4(1,0,0,1), "Frame time: %f ms", frameTime);
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Frame time: %f ms", frameTime);
     movingFPSAverage = (0.08f * (1000.0f / frameTime)) + (1.0f - 0.08f) * movingFPSAverage;
-    ImGui::TextColored(ImVec4(1,0,0,1), "FPS: %f", movingFPSAverage);
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "FPS: %f", movingFPSAverage);
     lastFrameTimestamp = ImGui::GetTime();
 
     std::vector<double> x(frameIndex);
-    std::iota (std::begin(x), std::end(x), 0);
-    if(ImPlot::BeginPlot("##Visibility")) {
+    std::iota(std::begin(x), std::end(x), 0);
+    if (ImPlot::BeginPlot("##Visibility")) {
         ImPlot::SetupAxis(ImAxis_X1, "Frame", ImPlotAxisFlags_AutoFit);
         ImPlot::SetupAxis(ImAxis_Y1, "Visibility", ImPlotAxisFlags_AutoFit);
 
         ImPlot::PlotLine("", x.data(), visibility.data(), int(frameIndex), ImPlotLineFlags_NoClip);
+        ImPlot::EndPlot();
+    }
+
+    if (ImPlot::BeginPlot("##Histogram")) {
+        ImPlot::SetupAxis(ImAxis_Y1, "Value", ImPlotAxisFlags_AutoFit);
+
+        uchar* xData = histograms.row(0).data;
+        ImPlot::PlotBars("", xData, HISTOGRAM_BINS);
         ImPlot::EndPlot();
     }
 

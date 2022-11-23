@@ -7,23 +7,21 @@
 #include "opencv4/opencv2/opencv.hpp"
 #include "../util/polyfit.h"
 
-void calculateVisibility(const int frameIndex, const cv::Mat &cameraFrame, const std::vector<double> &headingDif,
+void calculateVisibility(const int frameIndex, const cv::Mat &cameraFrameGray, const std::vector<double> &headingDif,
                          const std::vector<double> &attitudeDif, std::pair<int, int> &vanishingPoint,
                          std::vector<double> &visibilityCoeffs, std::vector<double> &visibility) {
+    Timer timer("Calculating visibility");
 
     // Estimate position of the road vanishing point
-    int32_t r_vp_x = (cameraFrame.cols / 2 + int32_t(HORIZONTAL_SENSITIVITY * headingDif[headingDif.size() - 1]) +
+    int32_t r_vp_x = (cameraFrameGray.cols / 2 + int32_t(HORIZONTAL_SENSITIVITY * headingDif[headingDif.size() - 1]) +
                       HORIZONTAL_OFFSET);
-    int32_t r_vp_y = (cameraFrame.rows / 2 + int32_t(VERTICAL_SENSITIVITY * attitudeDif[attitudeDif.size() - 1]) +
+    int32_t r_vp_y = (cameraFrameGray.rows / 2 + int32_t(VERTICAL_SENSITIVITY * attitudeDif[attitudeDif.size() - 1]) +
                       VERTICAL_OFFSET);
     vanishingPoint = std::pair(r_vp_x, r_vp_y);
 
     int32_t window_top_left_x = r_vp_x - (DFT_WINDOW_SIZE / 2);
     int32_t window_top_left_y = r_vp_y - (DFT_WINDOW_SIZE / 2);
     cv::Rect window_rect(window_top_left_x, window_top_left_y, DFT_WINDOW_SIZE, DFT_WINDOW_SIZE);
-
-    cv::Mat cameraFrameGray;
-    cv::cvtColor(cameraFrame, cameraFrameGray, cv::COLOR_BGR2GRAY);
 
     cv::Mat cameraFrameWindow = cameraFrameGray(window_rect);
 
