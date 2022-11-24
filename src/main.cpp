@@ -3,7 +3,6 @@
 #include <string>
 #include <dlfcn.h>
 
-
 #include "GlobalConfiguration.h"
 #include "../external/renderdoc/renderdoc_app.h"
 #include "algorithms/ImuExtract.h"
@@ -33,6 +32,5 @@ int main() {
         entryPoint->render();
         if (rdoc_api && RENDERDOC_ENABLED) rdoc_api->EndFrameCapture(nullptr, nullptr);
     }
-
     return 0;
 }

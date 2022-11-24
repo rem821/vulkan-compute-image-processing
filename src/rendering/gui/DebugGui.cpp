@@ -103,24 +103,29 @@ void DebugGui::showWindow(SDL_Window *window, long frameIndex, const std::vector
         ImPlot::EndPlot();
     }
 
+    /*
     if (ImPlot::BeginPlot("##Histogram")) {
-        ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 256);
+        ImPlot::SetupAxis(ImAxis_Y1, "Count", ImPlotAxisFlags_AutoFit);
+        ImPlot::SetupAxis(ImAxis_X1, "Bin", 0);
         ImPlot::SetupAxisLimits(ImAxis_X1, 0, HISTOGRAM_BINS);
 
-        uchar *xData = histograms.row(0).data;
+        const float *xData = &histograms.at<float>(0, 0);
         ImPlot::PlotBars("", xData, HISTOGRAM_BINS);
         ImPlot::EndPlot();
     }
+    */
 
     ImPlot::PushColormap(ImPlotColormap_Plasma);
     if (ImPlot::BeginPlot("##GlareHeatmap")) {
         static int axesFlags = ImPlotAxisFlags_Lock | ImPlotAxisFlags_NoGridLines | ImPlotAxisFlags_NoTickMarks |
-                ImPlotAxisFlags_NoLabel;
+                               ImPlotAxisFlags_NoLabel;
         ImPlot::SetupAxes(nullptr, nullptr, axesFlags, axesFlags);
-        ImPlot::SetupAxisTicks(ImAxis_X1, 0.0 + 1.0 / HISTOGRAM_COUNT, 1.0 - 1.0 / HISTOGRAM_COUNT, HISTOGRAM_COUNT, nullptr);
-        ImPlot::SetupAxisTicks(ImAxis_Y1, 1.0 - 1.0 / HISTOGRAM_COUNT, 0.0 + 1.0 / HISTOGRAM_COUNT, HISTOGRAM_COUNT, nullptr);
-
-        ImPlot::PlotHeatmap("", glareAmounts.data, HISTOGRAM_COUNT, HISTOGRAM_COUNT, 0, 1, nullptr, ImPlotPoint(0, 0), ImPlotPoint(1, 1), 0);
+        ImPlot::SetupAxisTicks(ImAxis_X1, 0.0 + 1.0 / HISTOGRAM_COUNT, 1.0 - 1.0 / HISTOGRAM_COUNT, HISTOGRAM_COUNT,
+                               nullptr);
+        ImPlot::SetupAxisTicks(ImAxis_Y1, 1.0 - 1.0 / HISTOGRAM_COUNT, 0.0 + 1.0 / HISTOGRAM_COUNT, HISTOGRAM_COUNT,
+                               nullptr);
+        ImPlot::PlotHeatmap("", &glareAmounts.at<float>(0), HISTOGRAM_COUNT, HISTOGRAM_COUNT, 0, 256, nullptr,
+                            ImPlotPoint(0, 0), ImPlotPoint(1, 1), ImPlotHeatmapFlags_ColMajor);
         ImPlot::EndPlot();
     }
 

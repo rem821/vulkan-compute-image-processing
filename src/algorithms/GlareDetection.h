@@ -26,24 +26,27 @@ void detectGlare(const cv::Mat &cameraFrameGray, std::pair<int, int> &vanishingP
         int histSize = HISTOGRAM_BINS;
         float range[] = {0, 256};
         const float *histRange[] = {range};
-        cv::calcHist(&imageRoi, 1, nullptr, cv::Mat(), histRoi, 1, &histSize, histRange, true, false);
+        cv::calcHist(&imageRoi, 1, 0, cv::Mat(), histRoi, 1, &histSize, histRange, true, false);
         histRoi = histRoi.t();
-        cv::Mat histRow = histograms.row(i + (j * HISTOGRAM_COUNT));
-        histRoi.copyTo(histRow);
+
+        for (int k = 0; k < histSize; k++) {
+            histograms.at<float>(i + (j * HISTOGRAM_COUNT), k) = histRoi.at<float>(k);
+        }
 
         // Step 4: Detect glare in each histogram
-        double nonGlareLuminance = 0, glareLuminance = 0;
+        float nonGlareLuminance = 0, glareLuminance = 0;
         for (int k = 0; k < HISTOGRAM_BINS; k++) {
             if (k >= glareBinThreshold) {
-                glareLuminance += histRow.data[k];
+                glareLuminance += histograms.at<float>(i + (j * HISTOGRAM_COUNT), k);
             } else {
-                nonGlareLuminance += histRow.data[k];
+                nonGlareLuminance += histograms.at<float>(i + (j * HISTOGRAM_COUNT), k);
             }
         }
-        if (glareLuminance > nonGlareLuminance) {
-            glareAmounts.data[i + (j * HISTOGRAM_COUNT)] = glareLuminance / (nonGlareLuminance + glareLuminance);
+
+        if (glareLuminance >= nonGlareLuminance) {
+            glareAmounts.at<float>(i, j) = (glareLuminance * 255.f) / (nonGlareLuminance + glareLuminance);
         } else {
-            glareAmounts.data[i + (j * HISTOGRAM_COUNT)] = 0;
+            glareAmounts.at<float>(i, j) = 0;
         }
 
         i++;

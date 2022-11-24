@@ -73,7 +73,6 @@ void VulkanEngineEntryPoint::prepareInputImage() {
             calculateVisibility(int(frameIndex), cameraFrameGray, headingDif, attitudeDif, vanishingPoint, visibilityCoeffs,
                                 visibility);
 
-
             detectGlare(cameraFrameGray, vanishingPoint, histograms, glareAmounts);
 
             vanishingPoint.first = int(

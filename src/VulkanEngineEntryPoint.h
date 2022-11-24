@@ -130,7 +130,6 @@ private:
 #if DEBUG_GUI_ENABLED
     DebugGui debugGui{engineDevice, renderer, window.sdlWindow()};
 #endif
-
     cv::VideoCapture video{std::string(SESSION_PATH) + std::string(VIDEO_PATH)};
     double lastReadFrame = -1;
     double totalFrames = video.get(cv::CAP_PROP_FRAME_COUNT);
@@ -177,7 +176,7 @@ private:
     std::vector<double> visibility;
 
     // Glare detection
-    cv::Mat histograms = cv::Mat(HISTOGRAM_COUNT * HISTOGRAM_COUNT, HISTOGRAM_BINS, CV_32FC1, cv::Scalar(0));
+    cv::Mat histograms = cv::Mat(HISTOGRAM_COUNT * HISTOGRAM_COUNT, HISTOGRAM_BINS, CV_32FC1, cv::Scalar(0.0f));
     cv::Mat glareAmounts = cv::Mat(HISTOGRAM_COUNT, HISTOGRAM_COUNT, CV_32FC1, cv::Scalar(0.0f));
 };
 

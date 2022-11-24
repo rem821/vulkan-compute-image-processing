@@ -32,7 +32,7 @@
 
 // Content section
 #define VIDEO_DOWNSCALE_FACTOR 1
-#define SESSION_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_2/"
+#define SESSION_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_4_2/"
 #define IMAGE_PATH "../assets/image.jpg"
 
 // Shaders section
