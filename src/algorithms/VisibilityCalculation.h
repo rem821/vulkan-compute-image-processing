@@ -93,34 +93,4 @@ void calculateVisibility(const int frameIndex, const cv::Mat &cameraFrameGray, c
                                                        max(MIN_VISIBILITY_THRESHOLD, coeffs[0]))) /
                                                   (MAX_VISIBILITY_THRESHOLD -
                                                    MIN_VISIBILITY_THRESHOLD)));
-
-    /*
-    cout << "PSS = [ ";
-    for (int i = 0; i < intMagINormPolar.cols; i++) {
-        cout << pss[i];
-        cout << " ";
-    }
-    cout << " ]" << endl;
-
-    cout << "Freq = [ ";
-    for (int i = 0; i < intMagINormPolar.cols; i++) {
-        cout << freq[i];
-        cout << " ";
-    }
-    cout << " ]" << endl;
-
-    cout << "VisibilityCoeffs = [ ";
-    for (float visibilityCoeff: visibilityCoeffs) {
-        cout << visibilityCoeff;
-        cout << " ";
-    }
-    cout << " ]" << endl;
-
-    cout << "Visibility = [ ";
-    for (float i: visibility) {
-        cout << i;
-        cout << " ";
-    }
-    cout << " ]" << endl;
-    */
 }

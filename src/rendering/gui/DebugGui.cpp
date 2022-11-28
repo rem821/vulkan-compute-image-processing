@@ -54,8 +54,9 @@ DebugGui::~DebugGui() {
     ImGui_ImplVulkan_Shutdown();
 }
 
-void DebugGui::showWindow(SDL_Window *window, long frameIndex, const std::vector<double> &visibility,
-                          const cv::Mat &histograms, const cv::Mat &glareAmounts) {
+void
+DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset, const std::vector<double> &visibility,
+                     const cv::Mat &histograms, const cv::Mat &glareAmounts) {
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplSDL2_NewFrame(window);
 
@@ -93,6 +94,11 @@ void DebugGui::showWindow(SDL_Window *window, long frameIndex, const std::vector
     ImGui::TextColored(ImVec4(1, 0, 0, 1), "FPS: %f", movingFPSAverage);
     lastFrameTimestamp = ImGui::GetTime();
 
+    ImGui::Text(" ");
+
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Time: %02d.%02d.%d %02d:%02d:%02d", dataset.day, dataset.month, dataset.year,
+                       dataset.hours, dataset.minutes, dataset.seconds);
+
     std::vector<double> x(frameIndex);
     std::iota(std::begin(x), std::end(x), 0);
     if (ImPlot::BeginPlot("##Visibility")) {
@@ -118,7 +124,7 @@ void DebugGui::showWindow(SDL_Window *window, long frameIndex, const std::vector
     ImPlot::PushColormap(ImPlotColormap_Plasma);
     if (ImPlot::BeginPlot("##GlareHeatmap")) {
         static int axesFlags = ImPlotAxisFlags_Lock | ImPlotAxisFlags_NoGridLines | ImPlotAxisFlags_NoTickMarks |
-                               ImPlotAxisFlags_NoLabel;
+                               ImPlotAxisFlags_NoLabel | ImPlotAxisFlags_NoTickLabels;
         ImPlot::SetupAxes(nullptr, nullptr, axesFlags, axesFlags);
         ImPlot::SetupAxisTicks(ImAxis_X1, 0.0 + 1.0 / HISTOGRAM_COUNT, 1.0 - 1.0 / HISTOGRAM_COUNT, HISTOGRAM_COUNT,
                                nullptr);

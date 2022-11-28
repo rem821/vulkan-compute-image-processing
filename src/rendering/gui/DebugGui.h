@@ -7,6 +7,7 @@
 #include "../VulkanEngineSwapChain.h"
 #include "../VulkanEngineRenderer.h"
 #include "../../GlobalConfiguration.h"
+#include "../../algorithms/DatasetFileReader.h"
 
 #include "SDL.h"
 #include "imgui_impl_sdl.h"
@@ -28,7 +29,8 @@ public:
     DebugGui &operator=(const DebugGui &) = delete;
 
     void
-    showWindow(SDL_Window *window, long frameIndex, const std::vector<double> &visibility, const cv::Mat &histograms,
+    showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset, const std::vector<double> &visibility,
+               const cv::Mat &histograms,
                const cv::Mat &glareAmounts);
 
     void render(VkCommandBuffer &commandBuffer);

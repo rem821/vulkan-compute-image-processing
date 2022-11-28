@@ -67,10 +67,11 @@ void VulkanEngineEntryPoint::prepareInputImage() {
             }
         }
 
-        if (!heading.empty()) {
+        if (dataset != nullptr && frameIndex != 0) {
             cv::Mat cameraFrameGray;
             cv::cvtColor(cameraFrame, cameraFrameGray, cv::COLOR_BGR2GRAY);
-            calculateVisibility(int(frameIndex), cameraFrameGray, headingDif, attitudeDif, vanishingPoint, visibilityCoeffs,
+            calculateVisibility(int(frameIndex), cameraFrameGray, dataset->headingDif, dataset->attitudeDif,
+                                vanishingPoint, visibilityCoeffs,
                                 visibility);
 
             detectGlare(cameraFrameGray, vanishingPoint, histograms, glareAmounts);
@@ -79,7 +80,6 @@ void VulkanEngineEntryPoint::prepareInputImage() {
                     float(vanishingPoint.first) * (float(window.getExtent().width) / float(cameraFrame.cols)));
             vanishingPoint.second = int(
                     float(vanishingPoint.second) * (float(window.getExtent().height) / float(cameraFrame.rows)));
-
         }
 
         {
@@ -619,7 +619,7 @@ void VulkanEngineEntryPoint::render() {
         // Record compute command buffer
 
 #if DEBUG_GUI_ENABLED
-        debugGui.showWindow(window.sdlWindow(), frameIndex, visibility, histograms, glareAmounts);
+        debugGui.showWindow(window.sdlWindow(), frameIndex, *dataset, visibility, histograms, glareAmounts);
 #endif
 
         // First ComputeShader call -> Calculate DarkChannelPrior + maxAirLight channels for each workgroup
@@ -823,18 +823,20 @@ void VulkanEngineEntryPoint::render() {
 
         vkQueueWaitIdle(engineDevice.graphicsQueue());
 
-        // Prepare next frame
         frameIndex += 1;
-        prepareInputImage();
-
-        updateGraphicsUniformBuffers();
-
-        updateComputeDescriptorSets();
-        updateGraphicsDescriptorSets();
 #if TIMER_ON
         fmt::print("--------------------------------------------------------------------------------------------\n");
 #endif
     }
+}
+
+void VulkanEngineEntryPoint::prepareNextFrame() {
+    prepareInputImage();
+
+    updateGraphicsUniformBuffers();
+
+    updateComputeDescriptorSets();
+    updateGraphicsDescriptorSets();
 }
 
 void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
@@ -1404,7 +1406,8 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
     delete[] dataRgb;
 }
 
-VkPipelineShaderStageCreateInfo VulkanEngineEntryPoint::loadShader(const std::string& fileName, VkShaderStageFlagBits stage) {
+VkPipelineShaderStageCreateInfo
+VulkanEngineEntryPoint::loadShader(const std::string &fileName, VkShaderStageFlagBits stage) {
     VkPipelineShaderStageCreateInfo shaderStage = {};
     shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shaderStage.stage = stage;

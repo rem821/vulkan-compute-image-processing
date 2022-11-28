@@ -32,7 +32,7 @@
 
 // Content section
 #define VIDEO_DOWNSCALE_FACTOR 1
-#define SESSION_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_4_2/"
+#define SESSION_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_4_3/"
 #define IMAGE_PATH "../assets/image.jpg"
 
 // Shaders section
@@ -73,6 +73,8 @@
 #define VIDEO_PATH "camera_left_front/video.mp4"
 #define TIMESTAMPS_PATH "camera_left_front/timestamps.txt"
 #define IMU_PATH "imu/imu.txt"
+#define TIME_PATH "gnss/time.txt"
+#define POSE_PATH "gnss/pose.txt"
 
 // IMU
 #define MAX_HEADING_DIF 3
@@ -86,13 +88,13 @@
 #define VERTICAL_SENSITIVITY 5000
 
 #define MAX_VISIBILITY_THRESHOLD 3400.0
-#define MIN_VISIBILITY_THRESHOLD 2200.0
-#define MOVING_AVERAGE_FORGET_RATE 0.05
+#define MIN_VISIBILITY_THRESHOLD 2600.0
+#define MOVING_AVERAGE_FORGET_RATE 0.005
 
 // GLARE DETECTION
 #define HISTOGRAM_COUNT 10
-#define HISTOGRAM_BINS 32
-#define GLARE_THRESHOLD 0.8
+#define HISTOGRAM_BINS 10
+#define GLARE_THRESHOLD 0.7
 
 // Debugging section
 #define TIMER_ON true

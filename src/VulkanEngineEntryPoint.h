@@ -13,6 +13,7 @@
 #include "rendering/VulkanTools.h"
 #include "GlobalConfiguration.h"
 #include "rendering/gui/DebugGui.h"
+#include "algorithms/DatasetFileReader.h"
 
 #include "opencv4/opencv2/opencv.hpp"
 
@@ -96,17 +97,15 @@ public:
 
     void updateGraphicsDescriptorSets();
 
-    void setImuPose(std::vector<double> &_heading, std::vector<double> &_headingDif, std::vector<double> &_attitude,
-                    std::vector<double> &_attitudeDif) {
-        heading = _heading;
-        headingDif = _headingDif;
-        attitude = _attitude;
-        attitudeDif = _attitudeDif;
-    }
-
     void render();
 
+    void prepareNextFrame();
+
     void handleEvents();
+
+    void setDataset(Dataset *_dataset) {
+        dataset = _dataset;
+    }
 
     void saveScreenshot(const char *filename);
 
@@ -160,15 +159,12 @@ private:
     float zoom = 0.0f;
     glm::vec2 panPosition = glm::vec2(0.0f, 0.0f);
 
+    // DatasetFileReader
+    Dataset *dataset;
+
     // Camera
     cv::Mat cameraFrame;
     cv::Mat cameraWindowFrame;
-    // IMU Pose
-    std::vector<double> heading;
-    std::vector<double> headingDif;
-
-    std::vector<double> attitude;
-    std::vector<double> attitudeDif;
 
     // Visibility calculation
     std::pair<int, int> vanishingPoint;
