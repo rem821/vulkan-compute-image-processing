@@ -96,8 +96,13 @@ DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset
 
     ImGui::Text(" ");
 
-    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Time: %02d.%02d.%d %02d:%02d:%02d", dataset.day, dataset.month, dataset.year,
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Time: %02d.%02d.%d %02d:%02d:%02d", dataset.day, dataset.month,
+                       dataset.year,
                        dataset.hours, dataset.minutes, dataset.seconds);
+
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Position: LAT:%f, LONG:%f, ALT:%f", dataset.latitude, dataset.longitude,
+                       dataset.altitude);
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Azimuth: %f", dataset.azimuth);
 
     std::vector<double> x(frameIndex);
     std::iota(std::begin(x), std::end(x), 0);

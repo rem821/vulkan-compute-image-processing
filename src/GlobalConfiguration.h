@@ -32,7 +32,7 @@
 
 // Content section
 #define VIDEO_DOWNSCALE_FACTOR 1
-#define SESSION_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_4_3/"
+#define SESSION_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_4_4/"
 #define IMAGE_PATH "../assets/image.jpg"
 
 // Shaders section
@@ -85,7 +85,7 @@
 #define HORIZONTAL_OFFSET 0
 #define VERTICAL_OFFSET (-50)
 #define HORIZONTAL_SENSITIVITY 150
-#define VERTICAL_SENSITIVITY 5000
+#define VERTICAL_SENSITIVITY 2500
 
 #define MAX_VISIBILITY_THRESHOLD 3400.0
 #define MIN_VISIBILITY_THRESHOLD 2600.0
@@ -94,7 +94,7 @@
 // GLARE DETECTION
 #define HISTOGRAM_COUNT 10
 #define HISTOGRAM_BINS 10
-#define GLARE_THRESHOLD 0.7
+#define GLARE_THRESHOLD 0.6
 
 // Debugging section
 #define TIMER_ON true

@@ -28,6 +28,7 @@ int main() {
 
     while (entryPoint->isRunning) {
         dataset->readData(entryPoint->frameIndex);
+        dataset->calculateSunrise();
         entryPoint->prepareNextFrame();
         entryPoint->handleEvents();
 
