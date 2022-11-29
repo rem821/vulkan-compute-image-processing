@@ -103,35 +103,35 @@ public:
             gnss_index += 1;
         } while (abs(timestamps[i] - gnss_timestamps[gnss_index]) < previousTimeDif);
 
+        dataset.year = int(year[gnss_index]);
+        dataset.month = int(month[gnss_index]);
+        dataset.day = int(day[gnss_index]);
+
+        dataset.hours = int(hours[gnss_index]);
+        dataset.minutes = int(minutes[gnss_index]);
+        dataset.seconds = int(seconds[gnss_index]);
+
+        dataset.latitude = latitude[gnss_index];
+        dataset.longitude = longitude[gnss_index];
+        dataset.altitude = altitude[gnss_index];
+        dataset.azimuth = azimuth[gnss_index];
+
         // Calculate heading and attitude
         glm::quat q = glm::quat(quat_w[imu_index], quat_x[imu_index], quat_y[imu_index], quat_z[imu_index]);
         glm::vec3 euler = glm::eulerAngles(q);
-        dataset.heading.emplace_back(((euler[2] + M_PI) * 360) / (2 * M_PI));
+        dataset.heading.emplace_back(((euler[2] + M_PI) * 180) / M_PI);
         dataset.attitude.emplace_back(euler[1]);
 
         // Save inferred variables
-        if (i > 0) {
-            dataset.headingDif.emplace_back(dataset.heading[i - 1] - dataset.heading[i]);
-            if (abs(dataset.headingDif[i]) > MAX_HEADING_DIF) {
-                dataset.headingDif[i] = dataset.headingDif[i - 1];
-            }
-            dataset.attitudeDif.emplace_back(dataset.attitude[i - 1] - dataset.attitude[i]);
-            if (abs(dataset.attitudeDif[i]) > MAX_ATTITUDE_DIF) {
-                dataset.attitudeDif[i] = 0;
-            }
+        if(i <= 0) return;
 
-            dataset.year = int(year[gnss_index]);
-            dataset.month = int(month[gnss_index]);
-            dataset.day = int(day[gnss_index]);
-
-            dataset.hours = int(hours[gnss_index]);
-            dataset.minutes = int(minutes[gnss_index]);
-            dataset.seconds = int(seconds[gnss_index]);
-
-            dataset.latitude = latitude[gnss_index];
-            dataset.longitude = longitude[gnss_index];
-            dataset.altitude = altitude[gnss_index];
-            dataset.azimuth = azimuth[gnss_index];
+        dataset.headingDif.emplace_back(dataset.heading[i - 1] - dataset.heading[i]);
+        if (abs(dataset.headingDif[i]) > MAX_HEADING_DIF) {
+            dataset.headingDif[i] = dataset.headingDif[i - 1];
+        }
+        dataset.attitudeDif.emplace_back(dataset.attitude[i - 1] - dataset.attitude[i]);
+        if (abs(dataset.attitudeDif[i]) > MAX_ATTITUDE_DIF) {
+            dataset.attitudeDif[i] = 0;
         }
     }
 
