@@ -7,6 +7,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include "../GlobalConfiguration.h"
 #include "../../external/fastcsv/csv.h"
+#include "../../external/sunset/sunset.h"
 #include <fmt/core.h>
 
 struct Dataset {
@@ -21,7 +22,10 @@ struct Dataset {
     std::vector<double> attitude;
     std::vector<double> attitudeDif;
 
-    double solarNoon, sunrise, sunset;
+    double sunrise, sunset;
+
+    bool isDaylight;
+    std::pair<float, float> vanishingPoint{};
 };
 
 class DatasetFileReader {
@@ -107,9 +111,16 @@ public:
         dataset.month = int(month[gnss_index]);
         dataset.day = int(day[gnss_index]);
 
-        dataset.hours = int(hours[gnss_index]);
+        dataset.hours = int(hours[gnss_index] + TIMEZONE_OFFSET);
         dataset.minutes = int(minutes[gnss_index]);
         dataset.seconds = int(seconds[gnss_index]);
+
+        // Daylight savings time
+        double dst = 0.0;
+        if(dataset.month > 3 && dataset.month < 10) dst = 1.0;
+        if(dataset.month == 3 && dataset.day >= 26 && dataset.hours >= 2) dst = 1.0;
+        if(dataset.month == 10 && dataset.day <= 29 && dataset.hours <= 3) dst = 1.0;
+        dataset.hours += int(dst);
 
         dataset.latitude = latitude[gnss_index];
         dataset.longitude = longitude[gnss_index];
@@ -122,35 +133,28 @@ public:
         dataset.heading.emplace_back(((euler[2] + M_PI) * 180) / M_PI);
         dataset.attitude.emplace_back(euler[1]);
 
+        // Calculate sun position and sunrise/sunset
+        sunCalc.setCurrentDate(dataset.year, dataset.month, dataset.day);
+        sunCalc.setPosition(dataset.latitude, dataset.longitude, TIMEZONE_OFFSET + dst);
+        dataset.sunrise = sunCalc.calcSunrise() / 60.0;
+        dataset.sunset = sunCalc.calcSunset() / 60.0;
+        double h = dataset.hours + (dataset.minutes / 60.0);
+        dataset.isDaylight = h < dataset.sunset && h > dataset.sunrise;
+
         // Save inferred variables
-        if(i <= 0) return;
+        if (i <= 0) return;
 
         dataset.headingDif.emplace_back(dataset.heading[i - 1] - dataset.heading[i]);
-        if (abs(dataset.headingDif[i]) > MAX_HEADING_DIF) {
-            dataset.headingDif[i] = dataset.headingDif[i - 1];
+        if (abs(dataset.headingDif.back()) > MAX_HEADING_DIF) {
+            dataset.headingDif.back() = 0;
         }
         dataset.attitudeDif.emplace_back(dataset.attitude[i - 1] - dataset.attitude[i]);
         if (abs(dataset.attitudeDif[i]) > MAX_ATTITUDE_DIF) {
-            dataset.attitudeDif[i] = 0;
+            dataset.attitudeDif.back() = 0;
         }
     }
 
     Dataset *getDataset() { return &dataset; }
-
-    void calculateSunrise() {
-        double dayOfYear = dataset.month * 30 + dataset.day;
-        double y = ((2 * M_PI) / 365.0) * (dayOfYear - 1.0 + (dataset.hours - 12.0) / 24.0);
-
-        double eqtime = 229.18 * (0.000075 + 0.001868 * cos(y) - 0.032077 * sin(y) - 0.014615 * cos(2 * y) -
-                                  0.040849 * sin(2 * y));
-        double decl = 0.006918 - 0.399912 * cos(y) + 0.070257 * sin(y) - 0.006758 * cos(2 * y) + 0.000907 * sin(2 * y) -
-                      0.002697 * cos(3 * y) + 0.00148 * sin(3 * y);
-
-        double ha = acos((cos((90.833 * M_PI) / 180.0) / (cos((dataset.latitude * M_PI) / 180.0) * cos(decl))) -
-                         (tan((dataset.latitude * M_PI) / 180.0) * tan(decl)));
-        dataset.sunrise = 720.0 - 4.0 * (dataset.longitude + ha) - eqtime;
-        fmt::print("{}", dataset.sunrise);
-    }
 
 private:
     Dataset dataset{};
@@ -163,6 +167,8 @@ private:
     std::vector<double> acc_x, acc_y, acc_z, ang_vel_x, ang_vel_y, ang_vel_z, quat_x, quat_y, quat_z, quat_w;
     std::vector<double> year, month, day, hours, minutes, seconds, nanoseconds;
     std::vector<double> latitude, longitude, altitude, azimuth;
+
+    SunSet sunCalc = SunSet();
 
     long imu_index = 0;
     long gnss_index = 0;

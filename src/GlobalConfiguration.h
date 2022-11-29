@@ -32,7 +32,7 @@
 
 // Content section
 #define VIDEO_DOWNSCALE_FACTOR 1
-#define SESSION_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_4_4/"
+#define SESSION_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_1/"
 #define IMAGE_PATH "../assets/image.jpg"
 
 // Shaders section
@@ -61,6 +61,7 @@
 
 #define SINGLE_VIEW_MODE true
 
+#define TIMEZONE_OFFSET 1
 #define SWEEP_FRAMES 40
 
 #define DARK_CHANNEL_PRIOR_SHADER "ImageDarkChannelPrior"

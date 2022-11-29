@@ -167,8 +167,6 @@ private:
     cv::Mat cameraWindowFrame;
 
     // Visibility calculation
-    std::pair<int, int> vanishingPoint;
-    std::vector<double> visibilityCoeffs;
     std::vector<double> visibility;
 
     // Glare detection

@@ -103,12 +103,14 @@ DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset
     ImGui::TextColored(ImVec4(1, 0, 0, 1), "Position: LAT:%f, LONG:%f, ALT:%f", dataset.latitude, dataset.longitude,
                        dataset.altitude);
     ImGui::TextColored(ImVec4(1, 0, 0, 1), "Azimuth: %f", dataset.azimuth);
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Sunrise: %dh %02dmin", int(dataset.sunrise),  int((dataset.sunrise - int(dataset.sunrise)) * 60.0));
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Sunset: %dh %02dmin", int(dataset.sunset),  int((dataset.sunset - int(dataset.sunset)) * 60.0));
 
     std::vector<double> x(frameIndex);
     std::iota(std::begin(x), std::end(x), 0);
-    if (ImPlot::BeginPlot("##Visibility")) {
+    if (ImPlot::BeginPlot("##Visibility (FFT)")) {
         ImPlot::SetupAxis(ImAxis_X1, "Frame", ImPlotAxisFlags_AutoFit);
-        ImPlot::SetupAxis(ImAxis_Y1, "Visibility", ImPlotAxisFlags_AutoFit);
+        ImPlot::SetupAxis(ImAxis_Y1, "Visibility (FFT)", ImPlotAxisFlags_AutoFit);
 
         ImPlot::PlotLine("", x.data(), visibility.data(), int(frameIndex), ImPlotLineFlags_NoClip);
         ImPlot::EndPlot();

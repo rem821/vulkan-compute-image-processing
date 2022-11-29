@@ -70,16 +70,12 @@ void VulkanEngineEntryPoint::prepareInputImage() {
         if (dataset != nullptr && frameIndex != 0) {
             cv::Mat cameraFrameGray;
             cv::cvtColor(cameraFrame, cameraFrameGray, cv::COLOR_BGR2GRAY);
-            calculateVisibility(int(frameIndex), cameraFrameGray, dataset->headingDif, dataset->attitudeDif,
-                                vanishingPoint, visibilityCoeffs,
-                                visibility);
+            calculateVisibility(int(frameIndex), cameraFrameGray, dataset, visibility);
 
-            detectGlare(cameraFrameGray, vanishingPoint, histograms, glareAmounts);
+            detectGlare(cameraFrameGray, dataset, histograms, glareAmounts);
 
-            vanishingPoint.first = int(
-                    float(vanishingPoint.first) * (float(window.getExtent().width) / float(cameraFrame.cols)));
-            vanishingPoint.second = int(
-                    float(vanishingPoint.second) * (float(window.getExtent().height) / float(cameraFrame.rows)));
+            dataset->vanishingPoint.first *= float(window.getExtent().width) / float(cameraFrame.cols);
+            dataset->vanishingPoint.second *= float(window.getExtent().height) / float(cameraFrame.rows);
         }
 
         {
@@ -190,7 +186,11 @@ void VulkanEngineEntryPoint::updateGraphicsUniformBuffers() {
     uboVertexShader.modelView = camera.getView();
     memcpy(uniformBufferVertexShader->getMappedMemory(), &uboVertexShader, sizeof(uboVertexShader));
 
-    uboFragmentShader.vanishingPoint = glm::vec3(vanishingPoint.first, vanishingPoint.second, DFT_WINDOW_SIZE);
+    if (dataset != nullptr) {
+        uboFragmentShader.vanishingPoint = glm::vec3(dataset->vanishingPoint.first, dataset->vanishingPoint.second,
+                                                     DFT_WINDOW_SIZE);
+    }
+
     memcpy(uniformBufferFragmentShader->getMappedMemory(), &uboFragmentShader, sizeof(uboFragmentShader));
 }
 
@@ -834,7 +834,6 @@ void VulkanEngineEntryPoint::prepareNextFrame() {
     prepareInputImage();
 
     updateGraphicsUniformBuffers();
-
     updateComputeDescriptorSets();
     updateGraphicsDescriptorSets();
 }

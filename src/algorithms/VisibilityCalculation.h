@@ -6,18 +6,18 @@
 #include "../profiling/Timer.h"
 #include "opencv4/opencv2/opencv.hpp"
 #include "../util/polyfit.h"
+#include "DatasetFileReader.h"
 
-void calculateVisibility(const int frameIndex, const cv::Mat &cameraFrameGray, const std::vector<double> &headingDif,
-                         const std::vector<double> &attitudeDif, std::pair<int, int> &vanishingPoint,
-                         std::vector<double> &visibilityCoeffs, std::vector<double> &visibility) {
+void calculateVisibility(const int frameIndex, const cv::Mat &cameraFrameGray, Dataset *dataset,
+                         std::vector<double> &visibility) {
     Timer timer("Calculating visibility");
 
     // Estimate position of the road vanishing point
-    int32_t r_vp_x = (cameraFrameGray.cols / 2 + int32_t(HORIZONTAL_SENSITIVITY * headingDif[headingDif.size() - 1]) +
+    int32_t r_vp_x = (cameraFrameGray.cols / 2 + int32_t(HORIZONTAL_SENSITIVITY * dataset->headingDif.back()) +
                       HORIZONTAL_OFFSET);
-    int32_t r_vp_y = (cameraFrameGray.rows / 2 + int32_t(VERTICAL_SENSITIVITY * attitudeDif[attitudeDif.size() - 1]) +
+    int32_t r_vp_y = (cameraFrameGray.rows / 2 + int32_t(VERTICAL_SENSITIVITY * dataset->attitudeDif.back()) +
                       VERTICAL_OFFSET);
-    vanishingPoint = std::pair(r_vp_x, r_vp_y);
+    dataset->vanishingPoint = std::pair(r_vp_x, r_vp_y);
 
     int32_t window_top_left_x = r_vp_x - (DFT_WINDOW_SIZE / 2);
     int32_t window_top_left_y = r_vp_y - (DFT_WINDOW_SIZE / 2);
@@ -65,8 +65,9 @@ void calculateVisibility(const int frameIndex, const cv::Mat &cameraFrameGray, c
     tmp.copyTo(q2);
 
     cv::Mat magINormPolar;
-    cv::warpPolar(magINorm, magINormPolar, cv::Size(magI.cols, magI.rows), cv::Point2f(magI.cols / 2, magI.rows / 2),
-                  magI.rows / 2, cv::WARP_POLAR_LINEAR);
+    cv::warpPolar(magINorm, magINormPolar, cv::Size(magI.cols, magI.rows),
+                  cv::Point2f(float(magI.cols) / 2, float(magI.rows) / 2), double(magI.rows) / 2.0,
+                  cv::WARP_POLAR_LINEAR);
     cv::Mat intMagINormPolar = cv::Mat_<uint8_t>(magINormPolar);
 
     cv::normalize(magINorm, magINorm, 0, 255, cv::NORM_MINMAX);
@@ -83,7 +84,7 @@ void calculateVisibility(const int frameIndex, const cv::Mat &cameraFrameGray, c
 
     std::vector<double> coeffs(3);
     polyfit(freq, pss, coeffs, 2);
-    visibilityCoeffs.push_back(coeffs[0]);
+
     if (visibility.empty()) visibility.push_back(1);
     else
         visibility.push_back(

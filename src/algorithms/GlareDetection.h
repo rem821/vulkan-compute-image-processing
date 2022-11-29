@@ -7,8 +7,7 @@
 #include "opencv4/opencv2/opencv.hpp"
 #include <fmt/core.h>
 
-void detectGlare(const cv::Mat &cameraFrameGray, std::pair<int, int> &vanishingPoint, cv::Mat &histograms,
-                 cv::Mat &glareAmounts) {
+void detectGlare(const cv::Mat &cameraFrameGray, Dataset *dataset, cv::Mat &histograms, cv::Mat &glareAmounts) {
     Timer timer("Detecting glare");
 
     // Step 1: Convert the frame to a color space that maximizes resolution in luminance
@@ -46,6 +45,11 @@ void detectGlare(const cv::Mat &cameraFrameGray, std::pair<int, int> &vanishingP
         if (glareLuminance >= nonGlareLuminance) {
             glareAmounts.at<float>(i, j) = (glareLuminance * 255.f) / (nonGlareLuminance + glareLuminance);
         } else {
+            glareAmounts.at<float>(i, j) = 0;
+        }
+
+        // For daylight images ignore skylight
+        if (j < HISTOGRAM_COUNT / 2 && dataset->isDaylight) {
             glareAmounts.at<float>(i, j) = 0;
         }
 
