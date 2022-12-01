@@ -48,10 +48,11 @@ void detectGlareAndOcclusion(const cv::Mat &cameraFrameGray, Dataset *dataset) {
 
         if (glareLuminance >= (regularLuminance + occlusionLuminance)) {
             dataset->occlusionBuffers.at(histIndex).push_back(true);
-            dataset->glareAmounts.at<float>(i, j) = (glareLuminance * 255.f) / (regularLuminance + glareLuminance);
+            dataset->glareAmounts.at<float>(i, j) =
+                    (glareLuminance * 255.0f) / (regularLuminance + glareLuminance + occlusionLuminance);
         } else if (occlusionLuminance >= (regularLuminance + glareLuminance)) {
             dataset->occlusionBuffers.at(histIndex).push_back(false);
-            if(dataset->occlusionBuffers.at(histIndex).dataSum() == 0) {
+            if (dataset->occlusionBuffers.at(histIndex).dataSum() == 0) {
                 dataset->glareAmounts.at<float>(i, j) = 0;
             } else {
                 dataset->glareAmounts.at<float>(i, j) = 64;
@@ -63,7 +64,9 @@ void detectGlareAndOcclusion(const cv::Mat &cameraFrameGray, Dataset *dataset) {
 
         // For daylight images ignore skylight
         if (j < HISTOGRAM_COUNT / 2 && dataset->isDaylight) {
-            dataset->glareAmounts.at<float>(i, j) = 0;
+            if (dataset->glareAmounts.at<float>(i, j) > 64) {
+                dataset->glareAmounts.at<float>(i, j) = 64;
+            }
         }
 
         i++;
