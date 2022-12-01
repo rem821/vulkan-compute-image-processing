@@ -1240,7 +1240,7 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
     // Check blit support for source and destination
     VkFormatProperties formatProps;
 
-    // Check if the device supports blitting from optimal images (the swapchain images are in optimal format)
+    // Check if the device supports blitting from optimal images (the swap-chain images are in optimal format)
     vkGetPhysicalDeviceFormatProperties(engineDevice.getPhysicalDevice(),
                                         renderer.getEngineSwapChain()->getSwapChainImageFormat(), &formatProps);
     if (!(formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_BLIT_SRC_BIT)) {
@@ -1253,18 +1253,17 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
         supportsBlit = false;
     }
 
-    // Source for the copy is the last rendered swapchain image
-    VkImage srcImage = renderer.getEngineSwapChain()->getImage(0); //TODO: Find proper index
+    // Source for the copy is the last rendered swap-chain image
+    VkImage srcImage = renderer.getEngineSwapChain()->getImage(0);
     uint32_t width = renderer.getEngineSwapChain()->getSwapChainExtent().width;
     uint32_t height = renderer.getEngineSwapChain()->getSwapChainExtent().height;
     uint32_t channels = 4;
-    size_t size = width * height * channels;
 
     // Create the linear tiled destination image to copy to and to read the memory from
     VkImageCreateInfo imageCreateCI{};
     imageCreateCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageCreateCI.imageType = VK_IMAGE_TYPE_2D;
-    // Note that vkCmdBlitImage (if supported) will also do format conversions if the swapchain color format would differ
+    // Note that vkCmdBlitImage (if supported) will also do format conversions if the swap-chain color format would differ
     imageCreateCI.format = VK_FORMAT_R8G8B8A8_UNORM;
     imageCreateCI.extent.width = width;
     imageCreateCI.extent.height = height;
@@ -1294,7 +1293,7 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
 
     VK_CHECK(vkBindImageMemory(engineDevice.getDevice(), dstImage, dstImageMemory, 0));
 
-    // Do the actual blit from the swapchain image to our host visible destination image
+    // Do the actual blit from the swap-chain image to our host visible destination image
     VkCommandBuffer copyCmd = engineDevice.beginSingleTimeCommands();
 
     // Transition destination image to transfer destination layout
@@ -1306,7 +1305,7 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
                    VK_PIPELINE_STAGE_TRANSFER_BIT,
                    VK_PIPELINE_STAGE_TRANSFER_BIT);
 
-    // Transition swapchain image from present to transfer source layout
+    // Transition swap-chain image from present to transfer source layout
     setImageLayout(copyCmd,
                    srcImage,
                    VK_IMAGE_ASPECT_COLOR_BIT,
@@ -1317,7 +1316,7 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
 
     // If source and destination support blit we'll blit as this also does automatic format conversion (e.g. from BGR to RGB)
     if (supportsBlit) {
-        // Define the region to blit (we will blit the whole swapchain image)
+        // Define the region to blit (we will blit the whole swap-chain image)
         VkOffset3D blitSize;
         blitSize.x = int(width);
         blitSize.y = int(height);
@@ -1384,19 +1383,11 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
     vkGetImageSubresourceLayout(engineDevice.getDevice(), dstImage, &subResource, &subResourceLayout);
 
     // Map image memory so we can start copying from it
-    const char *dataBgr;
-    vkMapMemory(engineDevice.getDevice(), dstImageMemory, 0, VK_WHOLE_SIZE, 0, (void **) &dataBgr);
-    dataBgr += subResourceLayout.offset;
+    const char *data;
+    vkMapMemory(engineDevice.getDevice(), dstImageMemory, 0, VK_WHOLE_SIZE, 0, (void **) &data);
+    data += subResourceLayout.offset;
 
-    auto *dataRgb = new uint8_t[size];
-    for (size_t i = 0; i < size; i += channels) {
-        dataRgb[i + 0] = dataBgr[i + 2];
-        dataRgb[i + 1] = dataBgr[i + 1];
-        dataRgb[i + 2] = dataBgr[i + 0];
-        dataRgb[i + 3] = dataBgr[i + 3];
-    }
-
-    stbi_write_png(filename, int(width), int(height), int(channels), dataRgb, 0);
+    stbi_write_png(filename, int(width), int(height), int(channels), data, 0);
 
     fmt::print("Screenshot saved to disk\n");
 
@@ -1404,7 +1395,6 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
     vkUnmapMemory(engineDevice.getDevice(), dstImageMemory);
     vkFreeMemory(engineDevice.getDevice(), dstImageMemory, nullptr);
     vkDestroyImage(engineDevice.getDevice(), dstImage, nullptr);
-    delete[] dataRgb;
 }
 
 VkPipelineShaderStageCreateInfo
