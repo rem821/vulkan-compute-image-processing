@@ -54,7 +54,8 @@ DebugGui::~DebugGui() {
     ImGui_ImplVulkan_Shutdown();
 }
 
-void DebugGui::showWindow(SDL_Window *window, long frameIndex, const std::vector<double>& visibility) {
+void
+DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset) {
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplSDL2_NewFrame(window);
 
@@ -69,7 +70,8 @@ void DebugGui::showWindow(SDL_Window *window, long frameIndex, const std::vector
     window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus;
 
     const ImGuiViewport *main_viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(ImVec2(main_viewport->WorkPos.x + 650, main_viewport->WorkPos.y + 20), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2(main_viewport->WorkPos.x + 650, main_viewport->WorkPos.y + 20),
+                            ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(550, 680), ImGuiCond_FirstUseEver);
 
 
@@ -80,31 +82,68 @@ void DebugGui::showWindow(SDL_Window *window, long frameIndex, const std::vector
     }
 
     // Frame index
-    ImGui::TextColored(ImVec4(1,0,0,1), "Frame: %ld", frameIndex);
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Frame: %ld", frameIndex);
 
     // Running time, Frame time and FPS (Moving Average)
 
-    ImGui::TextColored(ImVec4(1,0,0,1), "Running time: %f s", ImGui::GetTime());
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Running time: %f s", ImGui::GetTime());
     double frameTime = (ImGui::GetTime() - lastFrameTimestamp) * 1000;
-    ImGui::TextColored(ImVec4(1,0,0,1), "Frame time: %f ms", frameTime);
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Frame time: %f ms", frameTime);
     movingFPSAverage = (0.08f * (1000.0f / frameTime)) + (1.0f - 0.08f) * movingFPSAverage;
-    ImGui::TextColored(ImVec4(1,0,0,1), "FPS: %f", movingFPSAverage);
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "FPS: %f", movingFPSAverage);
     lastFrameTimestamp = ImGui::GetTime();
 
-    std::vector<double> x(frameIndex);
-    std::iota (std::begin(x), std::end(x), 0);
-    if(ImPlot::BeginPlot("##Visibility")) {
-        ImPlot::SetupAxis(ImAxis_X1, "Frame", ImPlotAxisFlags_AutoFit);
-        ImPlot::SetupAxis(ImAxis_Y1, "Visibility", ImPlotAxisFlags_AutoFit);
+    ImGui::Text(" ");
 
-        ImPlot::PlotLine("", x.data(), visibility.data(), int(frameIndex), ImPlotLineFlags_NoClip);
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Time: %02d.%02d.%d %02d:%02d:%02d", dataset.day, dataset.month,
+                       dataset.year,
+                       dataset.hours, dataset.minutes, dataset.seconds);
+
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Position: LAT:%f, LONG:%f, ALT:%f", dataset.latitude, dataset.longitude,
+                       dataset.altitude);
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Azimuth: %f", dataset.azimuth);
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Sunrise: %dh %02dmin", int(dataset.sunrise),  int((dataset.sunrise - int(dataset.sunrise)) * 60.0));
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Sunset: %dh %02dmin", int(dataset.sunset),  int((dataset.sunset - int(dataset.sunset)) * 60.0));
+
+    std::vector<double> x(frameIndex);
+    std::iota(std::begin(x), std::end(x), 0);
+    if (ImPlot::BeginPlot("##Visibility (FFT)")) {
+        ImPlot::SetupAxis(ImAxis_X1, "Frame", ImPlotAxisFlags_AutoFit);
+        ImPlot::SetupAxis(ImAxis_Y1, "Visibility (FFT)", ImPlotAxisFlags_AutoFit);
+
+        ImPlot::PlotLine("", x.data(), dataset.visibility.data(), int(frameIndex), ImPlotLineFlags_NoClip);
+        ImPlot::EndPlot();
+    }
+
+    /*
+    if (ImPlot::BeginPlot("##Histogram")) {
+        ImPlot::SetupAxis(ImAxis_Y1, "Count", ImPlotAxisFlags_AutoFit);
+        ImPlot::SetupAxis(ImAxis_X1, "Bin", 0);
+        ImPlot::SetupAxisLimits(ImAxis_X1, 0, HISTOGRAM_BINS);
+
+        const float *xData = &histograms.at<float>(0, 0);
+        ImPlot::PlotBars("", xData, HISTOGRAM_BINS);
+        ImPlot::EndPlot();
+    }
+    */
+
+    ImPlot::PushColormap(ImPlotColormap_Plasma);
+    if (ImPlot::BeginPlot("##GlareHeatmap")) {
+        static int axesFlags = ImPlotAxisFlags_Lock | ImPlotAxisFlags_NoGridLines | ImPlotAxisFlags_NoTickMarks |
+                               ImPlotAxisFlags_NoLabel | ImPlotAxisFlags_NoTickLabels;
+        ImPlot::SetupAxes(nullptr, nullptr, axesFlags, axesFlags);
+        ImPlot::SetupAxisTicks(ImAxis_X1, 0.0 + 1.0 / HISTOGRAM_COUNT, 1.0 - 1.0 / HISTOGRAM_COUNT, HISTOGRAM_COUNT,
+                               nullptr);
+        ImPlot::SetupAxisTicks(ImAxis_Y1, 1.0 - 1.0 / HISTOGRAM_COUNT, 0.0 + 1.0 / HISTOGRAM_COUNT, HISTOGRAM_COUNT,
+                               nullptr);
+        ImPlot::PlotHeatmap("", &dataset.glareAmounts.at<float>(0), HISTOGRAM_COUNT, HISTOGRAM_COUNT, 0, 256, nullptr,
+                            ImPlotPoint(0, 0), ImPlotPoint(1, 1), ImPlotHeatmapFlags_ColMajor);
         ImPlot::EndPlot();
     }
 
     ImGui::End();
 
     ImGui::Render();
-
 }
 
 void DebugGui::render(VkCommandBuffer &commandBuffer) {

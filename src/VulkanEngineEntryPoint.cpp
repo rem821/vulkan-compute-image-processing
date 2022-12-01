@@ -9,6 +9,7 @@
 #include "../external/stb/stb_image.h"
 #include "../external/stb/stb_image_write.h"
 #include "algorithms/VisibilityCalculation.h"
+#include "algorithms/GlareAndOcclusionDetection.h"
 #include <vulkan/vulkan.hpp>
 #include <fmt/core.h>
 #include <vector>
@@ -66,15 +67,15 @@ void VulkanEngineEntryPoint::prepareInputImage() {
             }
         }
 
-        if (!heading.empty()) {
-            Timer timer("Calculating visibility");
-            calculateVisibility(int(frameIndex), cameraFrame, headingDif, attitudeDif, vanishingPoint, visibilityCoeffs,
-                                visibility);
+        if (dataset != nullptr && frameIndex != 0) {
+            cv::Mat cameraFrameGray;
+            cv::cvtColor(cameraFrame, cameraFrameGray, cv::COLOR_BGR2GRAY);
+            calculateVisibility(int(frameIndex), cameraFrameGray, dataset);
 
-            vanishingPoint.first = int(
-                    float(vanishingPoint.first) * (float(window.getExtent().width) / float(cameraFrame.cols)));
-            vanishingPoint.second = int(
-                    float(vanishingPoint.second) * (float(window.getExtent().height) / float(cameraFrame.rows)));
+            detectGlareAndOcclusion(cameraFrameGray, dataset);
+
+            dataset->vanishingPoint.first *= float(window.getExtent().width) / float(cameraFrame.cols);
+            dataset->vanishingPoint.second *= float(window.getExtent().height) / float(cameraFrame.rows);
         }
 
         {
@@ -90,6 +91,8 @@ void VulkanEngineEntryPoint::prepareInputImage() {
                                        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
                                        VK_IMAGE_LAYOUT_GENERAL);
         }
+    } else {
+        isFinished = true;
     }
 }
 
@@ -185,7 +188,11 @@ void VulkanEngineEntryPoint::updateGraphicsUniformBuffers() {
     uboVertexShader.modelView = camera.getView();
     memcpy(uniformBufferVertexShader->getMappedMemory(), &uboVertexShader, sizeof(uboVertexShader));
 
-    uboFragmentShader.vanishingPoint = glm::vec3(vanishingPoint.first, vanishingPoint.second, DFT_WINDOW_SIZE);
+    if (dataset != nullptr) {
+        uboFragmentShader.vanishingPoint = glm::vec3(dataset->vanishingPoint.first, dataset->vanishingPoint.second,
+                                                     DFT_WINDOW_SIZE);
+    }
+
     memcpy(uniformBufferFragmentShader->getMappedMemory(), &uboFragmentShader, sizeof(uboFragmentShader));
 }
 
@@ -614,7 +621,7 @@ void VulkanEngineEntryPoint::render() {
         // Record compute command buffer
 
 #if DEBUG_GUI_ENABLED
-        debugGui.showWindow(window.sdlWindow(), frameIndex, visibility);
+        debugGui.showWindow(window.sdlWindow(), frameIndex, *dataset);
 #endif
 
         // First ComputeShader call -> Calculate DarkChannelPrior + maxAirLight channels for each workgroup
@@ -713,14 +720,14 @@ void VulkanEngineEntryPoint::render() {
         renderer.beginSwapChainRenderPass(bufferPair.graphicsCommandBuffer, radianceTexture.image);
         // Record graphics commandBuffer
 #if SINGLE_VIEW_MODE
-        float preWidth = renderer.getEngineSwapChain()->getSwapChainExtent().width;
-        float preHeight = renderer.getEngineSwapChain()->getSwapChainExtent().height;
+        uint32_t preWidth = renderer.getEngineSwapChain()->getSwapChainExtent().width;
+        uint32_t preHeight = renderer.getEngineSwapChain()->getSwapChainExtent().height;
 
         VkViewport viewport = {};
         viewport.x = panPosition.x;
         viewport.y = panPosition.y;
-        viewport.width = preWidth;
-        viewport.height = preHeight;
+        viewport.width = float(preWidth);
+        viewport.height = float(preHeight);
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
         VkRect2D scissor{{0, 0}, renderer.getEngineSwapChain()->getSwapChainExtent()};
@@ -818,18 +825,19 @@ void VulkanEngineEntryPoint::render() {
 
         vkQueueWaitIdle(engineDevice.graphicsQueue());
 
-        // Prepare next frame
         frameIndex += 1;
-        prepareInputImage();
-
-        updateGraphicsUniformBuffers();
-
-        updateComputeDescriptorSets();
-        updateGraphicsDescriptorSets();
 #if TIMER_ON
         fmt::print("--------------------------------------------------------------------------------------------\n");
 #endif
     }
+}
+
+void VulkanEngineEntryPoint::prepareNextFrame() {
+    prepareInputImage();
+
+    updateGraphicsUniformBuffers();
+    updateComputeDescriptorSets();
+    updateGraphicsDescriptorSets();
 }
 
 void VulkanEngineEntryPoint::updateComputeDescriptorSets() {
@@ -1399,7 +1407,8 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
     delete[] dataRgb;
 }
 
-VkPipelineShaderStageCreateInfo VulkanEngineEntryPoint::loadShader(const std::string& fileName, VkShaderStageFlagBits stage) {
+VkPipelineShaderStageCreateInfo
+VulkanEngineEntryPoint::loadShader(const std::string &fileName, VkShaderStageFlagBits stage) {
     VkPipelineShaderStageCreateInfo shaderStage = {};
     shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shaderStage.stage = stage;

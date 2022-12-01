@@ -7,11 +7,13 @@
 #include "../VulkanEngineSwapChain.h"
 #include "../VulkanEngineRenderer.h"
 #include "../../GlobalConfiguration.h"
+#include "../../algorithms/DatasetFileReader.h"
 
 #include "SDL.h"
 #include "imgui_impl_sdl.h"
 #include "imgui_impl_vulkan.h"
 #include "../../external/imgui/implot.h"
+#include "opencv4/opencv2/opencv.hpp"
 
 #include <vector>
 #include <chrono>
@@ -26,7 +28,7 @@ public:
 
     DebugGui &operator=(const DebugGui &) = delete;
 
-    void showWindow(SDL_Window *window, long frameIndex, const std::vector<double> &visibility);
+    void showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset);
 
     void render(VkCommandBuffer &commandBuffer);
 

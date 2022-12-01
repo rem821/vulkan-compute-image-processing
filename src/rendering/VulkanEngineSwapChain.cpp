@@ -393,10 +393,10 @@ VulkanEngineSwapChain::chooseSwapPresentMode(const std::vector<VkPresentModeKHR>
             return availablePresentMode;
         }
 
-        //if (availablePresentMode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
-        //    fmt::print("Present mode: Immediate\n");
-        //    return availablePresentMode;
-        //}
+        if (availablePresentMode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
+            fmt::print("Present mode: Immediate\n");
+            return availablePresentMode;
+        }
     }
 
     fmt::print("Present mode: V-Sync\n");
