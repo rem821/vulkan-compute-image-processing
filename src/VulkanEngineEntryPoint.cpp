@@ -1443,6 +1443,11 @@ VkShaderModule VulkanEngineEntryPoint::loadShaderModule(const char *fileName, Vk
 void VulkanEngineEntryPoint::handleEvents() {
     const Uint8 *keystate = SDL_GetKeyboardState(nullptr);
 
+    if (isStepping) {
+        isPaused = true;
+        isStepping = false;
+    }
+
     SDL_Event event;
     while (SDL_PollEvent(&event) != 0) {
 #if DEBUG_GUI_ENABLED
@@ -1494,8 +1499,15 @@ void VulkanEngineEntryPoint::handleEvents() {
 
     if (keystate[SDL_SCANCODE_ESCAPE]) {
         isRunning = false;
-    } else if (keystate[SDL_SCANCODE_S]) {
+    } else if (keystate[SDL_SCANCODE_P]) {
         saveScreenshot(fmt::format("../screenshots/screenshot_frame_{}.png", frameIndex).c_str());
+    } else if (keystate[SDL_SCANCODE_A]) {
+        isPaused = false;
+    } else if (keystate[SDL_SCANCODE_S]) {
+        isPaused = true;
+    } else if (keystate[SDL_SCANCODE_SPACE]) {
+        isPaused = false;
+        isStepping = true;
     } else if (keystate[SDL_SCANCODE_LEFT]) {
         if (frameIndex > SWEEP_FRAMES) {
             frameIndex -= SWEEP_FRAMES;

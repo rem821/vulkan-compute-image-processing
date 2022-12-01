@@ -107,8 +107,10 @@ public:
 
     void saveScreenshot(const char *filename);
 
-    bool isRunning = false;
-    bool isFinished = false;
+    bool isRunning = false; // If set to false, program will end
+    bool isFinished = false; // If set to false, no new data is available and program will stop on last frame
+    bool isPaused = false; // If set to false program will stop on the current frame and can be then resumed
+    bool isStepping = false; // If set to true, program will step one frame and pause
     uint32_t frameIndex = 0;
 private:
 
