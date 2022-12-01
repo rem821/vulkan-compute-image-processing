@@ -9,6 +9,8 @@
 #include "../../external/fastcsv/csv.h"
 #include "../../external/sunset/sunset.h"
 #include <fmt/core.h>
+#include "opencv4/opencv2/opencv.hpp"
+#include "../util/circularbuffer.h"
 
 struct Dataset {
     // Original variables
@@ -22,10 +24,18 @@ struct Dataset {
     std::vector<double> attitude;
     std::vector<double> attitudeDif;
 
-    double sunrise, sunset;
-
-    bool isDaylight;
     std::pair<float, float> vanishingPoint{};
+
+    double sunrise, sunset;
+    bool isDaylight;
+
+    // Visibility calculation
+    std::vector<double> visibility;
+
+    // Glare detection
+    cv::Mat histograms = cv::Mat(HISTOGRAM_COUNT * HISTOGRAM_COUNT, HISTOGRAM_BINS, CV_32FC1, cv::Scalar(0.0f));
+    cv::Mat glareAmounts = cv::Mat(HISTOGRAM_COUNT, HISTOGRAM_COUNT, CV_32FC1, cv::Scalar(0.0f));
+    std::vector<CircularBuffer<bool>> occlusionBuffers;
 };
 
 class DatasetFileReader {
@@ -89,6 +99,10 @@ public:
             altitude.emplace_back(_altitude);
             azimuth.emplace_back(_azimuth);
         }
+
+        for (int i = 0; i < HISTOGRAM_COUNT * HISTOGRAM_COUNT; i++) {
+            dataset.occlusionBuffers.emplace_back(OCCLUSION_MIN_FRAMES);
+        }
     }
 
     void readData(const uint32_t &frameIndex) {
@@ -117,9 +131,9 @@ public:
 
         // Daylight savings time
         double dst = 0.0;
-        if(dataset.month > 3 && dataset.month < 10) dst = 1.0;
-        if(dataset.month == 3 && dataset.day >= 26 && dataset.hours >= 2) dst = 1.0;
-        if(dataset.month == 10 && dataset.day <= 29 && dataset.hours <= 3) dst = 1.0;
+        if (dataset.month > 3 && dataset.month < 10) dst = 1.0;
+        if (dataset.month == 3 && dataset.day >= 26 && dataset.hours >= 2) dst = 1.0;
+        if (dataset.month == 10 && dataset.day <= 29 && dataset.hours <= 3) dst = 1.0;
         dataset.hours += int(dst);
 
         dataset.latitude = latitude[gnss_index];
@@ -128,7 +142,8 @@ public:
         dataset.azimuth = azimuth[gnss_index];
 
         // Calculate heading and attitude
-        glm::quat q = glm::quat(quat_w[imu_index], quat_x[imu_index], quat_y[imu_index], quat_z[imu_index]);
+        glm::quat q = glm::quat(float(quat_w[imu_index]), float(quat_x[imu_index]), float(quat_y[imu_index]),
+                                float(quat_z[imu_index]));
         glm::vec3 euler = glm::eulerAngles(q);
         dataset.heading.emplace_back(((euler[2] + M_PI) * 180) / M_PI);
         dataset.attitude.emplace_back(euler[1]);

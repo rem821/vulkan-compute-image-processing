@@ -8,8 +8,7 @@
 #include "../util/polyfit.h"
 #include "DatasetFileReader.h"
 
-void calculateVisibility(const int frameIndex, const cv::Mat &cameraFrameGray, Dataset *dataset,
-                         std::vector<double> &visibility) {
+void calculateVisibility(const int frameIndex, const cv::Mat &cameraFrameGray, Dataset *dataset) {
     Timer timer("Calculating visibility");
 
     // Estimate position of the road vanishing point
@@ -85,13 +84,13 @@ void calculateVisibility(const int frameIndex, const cv::Mat &cameraFrameGray, D
     std::vector<double> coeffs(3);
     polyfit(freq, pss, coeffs, 2);
 
-    if (visibility.empty()) visibility.push_back(1);
+    if (dataset->visibility.empty()) dataset->visibility.push_back(1);
     else
-        visibility.push_back(
-                (1.0 - MOVING_AVERAGE_FORGET_RATE) * visibility[visibility.size() - 1] +
-                MOVING_AVERAGE_FORGET_RATE * (1 - (MAX_VISIBILITY_THRESHOLD -
-                                                   min(MAX_VISIBILITY_THRESHOLD,
-                                                       max(MIN_VISIBILITY_THRESHOLD, coeffs[0]))) /
-                                                  (MAX_VISIBILITY_THRESHOLD -
-                                                   MIN_VISIBILITY_THRESHOLD)));
+        dataset->visibility.push_back((1.0 - MOVING_AVERAGE_FORGET_RATE) * dataset->visibility.back() +
+                                      MOVING_AVERAGE_FORGET_RATE * (1 - (MAX_VISIBILITY_THRESHOLD -
+                                                                         min(MAX_VISIBILITY_THRESHOLD,
+                                                                             max(MIN_VISIBILITY_THRESHOLD,
+                                                                                 coeffs[0]))) /
+                                                                        (MAX_VISIBILITY_THRESHOLD -
+                                                                         MIN_VISIBILITY_THRESHOLD)));
 }

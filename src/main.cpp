@@ -27,20 +27,21 @@ int main() {
     entryPoint->setDataset(dataset->getDataset());
 
     while (entryPoint->isRunning) {
-        dataset->readData(entryPoint->frameIndex);
-        entryPoint->prepareNextFrame();
         entryPoint->handleEvents();
+        if (!entryPoint->isFinished) {
+            dataset->readData(entryPoint->frameIndex);
+            entryPoint->prepareNextFrame();
 
 #if RENDERDOC_ENABLED
-        if (rdoc_api) rdoc_api->StartFrameCapture(nullptr, nullptr);
+            if (rdoc_api) rdoc_api->StartFrameCapture(nullptr, nullptr);
 #endif
 
-        entryPoint->render();
+            entryPoint->render();
 
 #if RENDERDOC_ENABLED
-        if (rdoc_api) rdoc_api->EndFrameCapture(nullptr, nullptr);
+            if (rdoc_api) rdoc_api->EndFrameCapture(nullptr, nullptr);
 #endif
-
+        }
     }
     return 0;
 }

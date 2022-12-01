@@ -15,8 +15,6 @@
 #include "rendering/gui/DebugGui.h"
 #include "algorithms/DatasetFileReader.h"
 
-#include "opencv4/opencv2/opencv.hpp"
-
 #include "glm/glm.hpp"
 
 struct Vertex {
@@ -110,6 +108,7 @@ public:
     void saveScreenshot(const char *filename);
 
     bool isRunning = false;
+    bool isFinished = false;
     uint32_t frameIndex = 0;
 private:
 
@@ -160,18 +159,11 @@ private:
     glm::vec2 panPosition = glm::vec2(0.0f, 0.0f);
 
     // DatasetFileReader
-    Dataset *dataset;
+    Dataset *dataset{};
 
     // Camera
     cv::Mat cameraFrame;
     cv::Mat cameraWindowFrame;
-
-    // Visibility calculation
-    std::vector<double> visibility;
-
-    // Glare detection
-    cv::Mat histograms = cv::Mat(HISTOGRAM_COUNT * HISTOGRAM_COUNT, HISTOGRAM_BINS, CV_32FC1, cv::Scalar(0.0f));
-    cv::Mat glareAmounts = cv::Mat(HISTOGRAM_COUNT, HISTOGRAM_COUNT, CV_32FC1, cv::Scalar(0.0f));
 };
 
 

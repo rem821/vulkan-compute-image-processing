@@ -55,8 +55,7 @@ DebugGui::~DebugGui() {
 }
 
 void
-DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset, const std::vector<double> &visibility,
-                     const cv::Mat &histograms, const cv::Mat &glareAmounts) {
+DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset) {
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplSDL2_NewFrame(window);
 
@@ -112,7 +111,7 @@ DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset
         ImPlot::SetupAxis(ImAxis_X1, "Frame", ImPlotAxisFlags_AutoFit);
         ImPlot::SetupAxis(ImAxis_Y1, "Visibility (FFT)", ImPlotAxisFlags_AutoFit);
 
-        ImPlot::PlotLine("", x.data(), visibility.data(), int(frameIndex), ImPlotLineFlags_NoClip);
+        ImPlot::PlotLine("", x.data(), dataset.visibility.data(), int(frameIndex), ImPlotLineFlags_NoClip);
         ImPlot::EndPlot();
     }
 
@@ -137,7 +136,7 @@ DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset
                                nullptr);
         ImPlot::SetupAxisTicks(ImAxis_Y1, 1.0 - 1.0 / HISTOGRAM_COUNT, 0.0 + 1.0 / HISTOGRAM_COUNT, HISTOGRAM_COUNT,
                                nullptr);
-        ImPlot::PlotHeatmap("", &glareAmounts.at<float>(0), HISTOGRAM_COUNT, HISTOGRAM_COUNT, 0, 256, nullptr,
+        ImPlot::PlotHeatmap("", &dataset.glareAmounts.at<float>(0), HISTOGRAM_COUNT, HISTOGRAM_COUNT, 0, 256, nullptr,
                             ImPlotPoint(0, 0), ImPlotPoint(1, 1), ImPlotHeatmapFlags_ColMajor);
         ImPlot::EndPlot();
     }

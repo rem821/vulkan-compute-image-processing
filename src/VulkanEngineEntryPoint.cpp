@@ -9,7 +9,7 @@
 #include "../external/stb/stb_image.h"
 #include "../external/stb/stb_image_write.h"
 #include "algorithms/VisibilityCalculation.h"
-#include "algorithms/GlareDetection.h"
+#include "algorithms/GlareAndOcclusionDetection.h"
 #include <vulkan/vulkan.hpp>
 #include <fmt/core.h>
 #include <vector>
@@ -70,9 +70,9 @@ void VulkanEngineEntryPoint::prepareInputImage() {
         if (dataset != nullptr && frameIndex != 0) {
             cv::Mat cameraFrameGray;
             cv::cvtColor(cameraFrame, cameraFrameGray, cv::COLOR_BGR2GRAY);
-            calculateVisibility(int(frameIndex), cameraFrameGray, dataset, visibility);
+            calculateVisibility(int(frameIndex), cameraFrameGray, dataset);
 
-            detectGlare(cameraFrameGray, dataset, histograms, glareAmounts);
+            detectGlareAndOcclusion(cameraFrameGray, dataset);
 
             dataset->vanishingPoint.first *= float(window.getExtent().width) / float(cameraFrame.cols);
             dataset->vanishingPoint.second *= float(window.getExtent().height) / float(cameraFrame.rows);
@@ -91,6 +91,8 @@ void VulkanEngineEntryPoint::prepareInputImage() {
                                        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
                                        VK_IMAGE_LAYOUT_GENERAL);
         }
+    } else {
+        isFinished = true;
     }
 }
 
@@ -619,7 +621,7 @@ void VulkanEngineEntryPoint::render() {
         // Record compute command buffer
 
 #if DEBUG_GUI_ENABLED
-        debugGui.showWindow(window.sdlWindow(), frameIndex, *dataset, visibility, histograms, glareAmounts);
+        debugGui.showWindow(window.sdlWindow(), frameIndex, *dataset);
 #endif
 
         // First ComputeShader call -> Calculate DarkChannelPrior + maxAirLight channels for each workgroup
@@ -718,14 +720,14 @@ void VulkanEngineEntryPoint::render() {
         renderer.beginSwapChainRenderPass(bufferPair.graphicsCommandBuffer, radianceTexture.image);
         // Record graphics commandBuffer
 #if SINGLE_VIEW_MODE
-        float preWidth = renderer.getEngineSwapChain()->getSwapChainExtent().width;
-        float preHeight = renderer.getEngineSwapChain()->getSwapChainExtent().height;
+        uint32_t preWidth = renderer.getEngineSwapChain()->getSwapChainExtent().width;
+        uint32_t preHeight = renderer.getEngineSwapChain()->getSwapChainExtent().height;
 
         VkViewport viewport = {};
         viewport.x = panPosition.x;
         viewport.y = panPosition.y;
-        viewport.width = preWidth;
-        viewport.height = preHeight;
+        viewport.width = float(preWidth);
+        viewport.height = float(preHeight);
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
         VkRect2D scissor{{0, 0}, renderer.getEngineSwapChain()->getSwapChainExtent()};
