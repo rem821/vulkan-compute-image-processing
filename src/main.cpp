@@ -20,7 +20,7 @@ void runCameraAlgorithms(Dataset *dataset) {
         cv::cvtColor(dataset->cameraFrame, cameraFrameGray, cv::COLOR_BGR2GRAY);
 
         estimateVanishingPointPosition(dataset);
-        calculateVisibility(cameraFrameGray, dataset);
+        calculateVisibility(cameraFrameGray, dataset, dataset->vanishingPoint);
         detectGlareAndOcclusion(cameraFrameGray, dataset);
     }
 }

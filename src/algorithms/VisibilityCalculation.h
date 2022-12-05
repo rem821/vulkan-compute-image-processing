@@ -7,12 +7,13 @@
 #include "opencv4/opencv2/opencv.hpp"
 #include "../util/polyfit.h"
 #include "DatasetFileReader.h"
+#include <fmt/core.h>
 
-void calculateVisibility(const cv::Mat &cameraFrameGray, Dataset *dataset) {
-    Timer timer("Calculating visibility");
+void calculateVisibility(const cv::Mat &cameraFrameGray, Dataset *dataset, std::pair<float, float> centerPoint) {
+    Timer timer(fmt::format("Calculating visibility around point: ({}, {})", centerPoint.first, centerPoint.second));
 
-    int32_t window_top_left_x = int(dataset->vanishingPoint.first) - (DFT_WINDOW_SIZE / 2);
-    int32_t window_top_left_y = int(dataset->vanishingPoint.second) - (DFT_WINDOW_SIZE / 2);
+    int32_t window_top_left_x = int(centerPoint.first) - (DFT_WINDOW_SIZE / 2);
+    int32_t window_top_left_y = int(centerPoint.second) - (DFT_WINDOW_SIZE / 2);
     cv::Rect window_rect(window_top_left_x, window_top_left_y, DFT_WINDOW_SIZE, DFT_WINDOW_SIZE);
 
     cv::Mat cameraFrameWindow = cameraFrameGray(window_rect);
