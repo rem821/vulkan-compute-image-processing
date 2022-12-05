@@ -8,18 +8,11 @@
 #include "../util/polyfit.h"
 #include "DatasetFileReader.h"
 
-void calculateVisibility(const int frameIndex, const cv::Mat &cameraFrameGray, Dataset *dataset) {
+void calculateVisibility(const cv::Mat &cameraFrameGray, Dataset *dataset) {
     Timer timer("Calculating visibility");
 
-    // Estimate position of the road vanishing point
-    int32_t r_vp_x = (cameraFrameGray.cols / 2 + int32_t(HORIZONTAL_SENSITIVITY * dataset->headingDif.back()) +
-                      HORIZONTAL_OFFSET);
-    int32_t r_vp_y = (cameraFrameGray.rows / 2 + int32_t(VERTICAL_SENSITIVITY * dataset->attitudeDif.back()) +
-                      VERTICAL_OFFSET);
-    dataset->vanishingPoint = std::pair(r_vp_x, r_vp_y);
-
-    int32_t window_top_left_x = r_vp_x - (DFT_WINDOW_SIZE / 2);
-    int32_t window_top_left_y = r_vp_y - (DFT_WINDOW_SIZE / 2);
+    int32_t window_top_left_x = int(dataset->vanishingPoint.first) - (DFT_WINDOW_SIZE / 2);
+    int32_t window_top_left_y = int(dataset->vanishingPoint.second) - (DFT_WINDOW_SIZE / 2);
     cv::Rect window_rect(window_top_left_x, window_top_left_y, DFT_WINDOW_SIZE, DFT_WINDOW_SIZE);
 
     cv::Mat cameraFrameWindow = cameraFrameGray(window_rect);

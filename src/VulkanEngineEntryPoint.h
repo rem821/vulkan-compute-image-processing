@@ -67,7 +67,7 @@ public:
         VkPipeline pipeline;
     };
 
-    VulkanEngineEntryPoint();
+    VulkanEngineEntryPoint(Dataset* dataset);
 
     ~VulkanEngineEntryPoint() = default;
 
@@ -101,17 +101,12 @@ public:
 
     void handleEvents();
 
-    void setDataset(Dataset *_dataset) {
-        dataset = _dataset;
-    }
-
     void saveScreenshot(const char *filename);
 
     bool isRunning = false; // If set to false, program will end
     bool isFinished = false; // If set to false, no new data is available and program will stop on last frame
     bool isPaused = false; // If set to false program will stop on the current frame and can be then resumed
     bool isStepping = false; // If set to true, program will step one frame and pause
-    uint32_t frameIndex = 0;
 private:
 
     VkPipelineShaderStageCreateInfo loadShader(const std::string &fileName, VkShaderStageFlagBits stage);
@@ -130,9 +125,6 @@ private:
 #if DEBUG_GUI_ENABLED
     DebugGui debugGui{engineDevice, renderer, window.sdlWindow()};
 #endif
-    cv::VideoCapture video{std::string(SESSION_PATH) + std::string(VIDEO_PATH)};
-    double lastReadFrame = -1;
-    double totalFrames = video.get(cv::CAP_PROP_FRAME_COUNT);
 
     Texture2D inputTexture{};
     Texture2D darkChannelPriorTexture{};
@@ -161,11 +153,7 @@ private:
     glm::vec2 panPosition = glm::vec2(0.0f, 0.0f);
 
     // DatasetFileReader
-    Dataset *dataset{};
-
-    // Camera
-    cv::Mat cameraFrame;
-    cv::Mat cameraWindowFrame;
+    Dataset* dataset;
 };
 
 

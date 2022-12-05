@@ -11,36 +11,13 @@
 #include <fmt/core.h>
 #include "opencv4/opencv2/opencv.hpp"
 #include "../util/circularbuffer.h"
+#include "../util/Dataset.h"
+#include "../profiling/Timer.h"
 
-struct Dataset {
-    // Original variables
-    int year, month, day, hours, minutes, seconds;
-    double latitude, longitude, altitude, azimuth;
-
-    // Inferred variables
-    std::vector<double> heading;
-    std::vector<double> headingDif;
-
-    std::vector<double> attitude;
-    std::vector<double> attitudeDif;
-
-    std::pair<float, float> vanishingPoint{};
-
-    double sunrise, sunset;
-    bool isDaylight;
-
-    // Visibility calculation
-    std::vector<double> visibility;
-
-    // Glare detection
-    cv::Mat histograms = cv::Mat(HISTOGRAM_COUNT * HISTOGRAM_COUNT, HISTOGRAM_BINS, CV_32FC1, cv::Scalar(0.0f));
-    cv::Mat glareAmounts = cv::Mat(HISTOGRAM_COUNT, HISTOGRAM_COUNT, CV_32FC1, cv::Scalar(0.0f));
-    std::vector<CircularBuffer<bool>> occlusionBuffers;
-};
 
 class DatasetFileReader {
 public:
-    DatasetFileReader() {
+    DatasetFileReader(Dataset *_dataset) : dataset(_dataset) {
         io::CSVReader<1> in_timestamps(std::string(SESSION_PATH) + std::string(TIMESTAMPS_PATH));
         in_timestamps.read_header(io::ignore_extra_column, "epoch_timestamp");
 
@@ -101,12 +78,14 @@ public:
         }
 
         for (int i = 0; i < HISTOGRAM_COUNT * HISTOGRAM_COUNT; i++) {
-            dataset.occlusionBuffers.emplace_back(OCCLUSION_MIN_FRAMES);
+            dataset->occlusionBuffers.emplace_back(OCCLUSION_MIN_FRAMES);
         }
+
+        readData();
     }
 
-    void readData(const uint32_t &frameIndex) {
-        long i = frameIndex;
+    void readData() {
+        long i = dataset->frameIndex;
 
         // Find IMU positions that corresponds to the actual camera frame timestamp
         do {
@@ -121,58 +100,68 @@ public:
             gnss_index += 1;
         } while (abs(timestamps[i] - gnss_timestamps[gnss_index]) < previousTimeDif);
 
-        dataset.year = int(year[gnss_index]);
-        dataset.month = int(month[gnss_index]);
-        dataset.day = int(day[gnss_index]);
+        dataset->year = int(year[gnss_index]);
+        dataset->month = int(month[gnss_index]);
+        dataset->day = int(day[gnss_index]);
 
-        dataset.hours = int(hours[gnss_index] + TIMEZONE_OFFSET);
-        dataset.minutes = int(minutes[gnss_index]);
-        dataset.seconds = int(seconds[gnss_index]);
+        dataset->hours = int(hours[gnss_index] + TIMEZONE_OFFSET);
+        dataset->minutes = int(minutes[gnss_index]);
+        dataset->seconds = int(seconds[gnss_index]);
 
         // Daylight savings time
         double dst = 0.0;
-        if (dataset.month > 3 && dataset.month < 10) dst = 1.0;
-        if (dataset.month == 3 && dataset.day >= 26 && dataset.hours >= 2) dst = 1.0;
-        if (dataset.month == 10 && dataset.day <= 29 && dataset.hours <= 3) dst = 1.0;
-        dataset.hours += int(dst);
+        if (dataset->month > 3 && dataset->month < 10) dst = 1.0;
+        if (dataset->month == 3 && dataset->day >= 26 && dataset->hours >= 2) dst = 1.0;
+        if (dataset->month == 10 && dataset->day <= 29 && dataset->hours <= 3) dst = 1.0;
+        dataset->hours += int(dst);
 
-        dataset.latitude = latitude[gnss_index];
-        dataset.longitude = longitude[gnss_index];
-        dataset.altitude = altitude[gnss_index];
-        dataset.azimuth = azimuth[gnss_index];
+        dataset->latitude = latitude[gnss_index];
+        dataset->longitude = longitude[gnss_index];
+        dataset->altitude = altitude[gnss_index];
+        dataset->azimuth = azimuth[gnss_index];
 
         // Calculate heading and attitude
         glm::quat q = glm::quat(float(quat_w[imu_index]), float(quat_x[imu_index]), float(quat_y[imu_index]),
                                 float(quat_z[imu_index]));
         glm::vec3 euler = glm::eulerAngles(q);
-        dataset.heading.emplace_back(((euler[2] + M_PI) * 180) / M_PI);
-        dataset.attitude.emplace_back(euler[1]);
+        dataset->heading.emplace_back(((euler[2] + M_PI) * 180) / M_PI);
+        dataset->attitude.emplace_back(euler[1]);
 
         // Calculate sun position and sunrise/sunset
-        sunCalc.setCurrentDate(dataset.year, dataset.month, dataset.day);
-        sunCalc.setPosition(dataset.latitude, dataset.longitude, TIMEZONE_OFFSET + dst);
-        dataset.sunrise = sunCalc.calcSunrise() / 60.0;
-        dataset.sunset = sunCalc.calcSunset() / 60.0;
-        double h = dataset.hours + (dataset.minutes / 60.0);
-        dataset.isDaylight = h < dataset.sunset && h > dataset.sunrise;
+        sunCalc.setCurrentDate(dataset->year, dataset->month, dataset->day);
+        sunCalc.setPosition(dataset->latitude, dataset->longitude, TIMEZONE_OFFSET + dst);
+        dataset->sunrise = sunCalc.calcSunrise() / 60.0;
+        dataset->sunset = sunCalc.calcSunset() / 60.0;
+        double h = dataset->hours + (dataset->minutes / 60.0);
+        dataset->isDaylight = h < dataset->sunset && h > dataset->sunrise;
+
+        readCameraFrame();
 
         // Save inferred variables
         if (i <= 0) return;
 
-        dataset.headingDif.emplace_back(dataset.heading[i - 1] - dataset.heading[i]);
-        if (abs(dataset.headingDif.back()) > MAX_HEADING_DIF) {
-            dataset.headingDif.back() = 0;
+        dataset->headingDif.emplace_back(dataset->heading[i - 1] - dataset->heading[i]);
+        if (abs(dataset->headingDif.back()) > MAX_HEADING_DIF) {
+            dataset->headingDif.back() = 0;
         }
-        dataset.attitudeDif.emplace_back(dataset.attitude[i - 1] - dataset.attitude[i]);
-        if (abs(dataset.attitudeDif[i]) > MAX_ATTITUDE_DIF) {
-            dataset.attitudeDif.back() = 0;
+        dataset->attitudeDif.emplace_back(dataset->attitude[i - 1] - dataset->attitude[i]);
+        if (abs(dataset->attitudeDif[i]) > MAX_ATTITUDE_DIF) {
+            dataset->attitudeDif.back() = 0;
+        }
+
+    }
+
+    void readCameraFrame() {
+        if (dataset->frameIndex < totalFrames) {
+            {
+                Timer timer("Reading next video frame");
+                video.read(dataset->cameraFrame);
+            }
         }
     }
 
-    Dataset *getDataset() { return &dataset; }
-
 private:
-    Dataset dataset{};
+    Dataset *dataset;
 
     std::vector<long> timestamps;
     std::vector<long> imu_timestamps;
@@ -188,6 +177,10 @@ private:
     long imu_index = 0;
     long gnss_index = 0;
     long previousTimeDif = INT_MAX;
+
+    // Camera
+    cv::VideoCapture video{std::string(SESSION_PATH) + std::string(VIDEO_PATH)};
+    double totalFrames = video.get(cv::CAP_PROP_FRAME_COUNT);
 };
 
 

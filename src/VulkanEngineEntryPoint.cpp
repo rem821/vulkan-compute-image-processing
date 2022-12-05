@@ -8,13 +8,11 @@
 #include "profiling/Timer.h"
 #include "../external/stb/stb_image.h"
 #include "../external/stb/stb_image_write.h"
-#include "algorithms/VisibilityCalculation.h"
-#include "algorithms/GlareAndOcclusionDetection.h"
 #include <vulkan/vulkan.hpp>
 #include <fmt/core.h>
 #include <vector>
 
-VulkanEngineEntryPoint::VulkanEngineEntryPoint() {
+VulkanEngineEntryPoint::VulkanEngineEntryPoint(Dataset* _dataset): dataset(_dataset) {
 
     // Init resources
     prepareInputImage();
@@ -57,43 +55,19 @@ VulkanEngineEntryPoint::VulkanEngineEntryPoint() {
 }
 
 void VulkanEngineEntryPoint::prepareInputImage() {
+    Timer timer("Generating texture from input image");
+    cv::Mat rgba;
 
-    if (frameIndex < totalFrames) {
-        {
-            Timer timer("Reading next video frame");
-            while (lastReadFrame < frameIndex) {
-                video.read(cameraFrame);
-                lastReadFrame += 1;
-            }
-        }
+    cv::cvtColor(dataset->cameraFrame, rgba, cv::COLOR_BGR2RGBA);
 
-        if (dataset != nullptr && frameIndex != 0) {
-            cv::Mat cameraFrameGray;
-            cv::cvtColor(cameraFrame, cameraFrameGray, cv::COLOR_BGR2GRAY);
-            calculateVisibility(int(frameIndex), cameraFrameGray, dataset);
 
-            detectGlareAndOcclusion(cameraFrameGray, dataset);
 
-            dataset->vanishingPoint.first *= float(window.getExtent().width) / float(cameraFrame.cols);
-            dataset->vanishingPoint.second *= float(window.getExtent().height) / float(cameraFrame.rows);
-        }
-
-        {
-            Timer timer("Creating texture from the video frame");
-
-            cv::Mat rgba;
-            cv::cvtColor(cameraFrame, rgba, cv::COLOR_BGR2RGBA);
-
-            inputTexture.fromImageFile(rgba.data, rgba.cols * rgba.rows * rgba.channels(), VK_FORMAT_R8G8B8A8_UNORM,
-                                       rgba.cols, rgba.rows,
-                                       engineDevice,
-                                       engineDevice.graphicsQueue(), VK_FILTER_LINEAR,
-                                       VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-                                       VK_IMAGE_LAYOUT_GENERAL);
-        }
-    } else {
-        isFinished = true;
-    }
+    inputTexture.fromImageFile(rgba.data, rgba.cols * rgba.rows * rgba.channels(), VK_FORMAT_R8G8B8A8_UNORM,
+                               rgba.cols, rgba.rows,
+                               engineDevice,
+                               engineDevice.graphicsQueue(), VK_FILTER_LINEAR,
+                               VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+                               VK_IMAGE_LAYOUT_GENERAL);
 }
 
 void VulkanEngineEntryPoint::generateQuad() {
@@ -621,7 +595,7 @@ void VulkanEngineEntryPoint::render() {
         // Record compute command buffer
 
 #if DEBUG_GUI_ENABLED
-        debugGui.showWindow(window.sdlWindow(), frameIndex, *dataset);
+        debugGui.showWindow(window.sdlWindow(), dataset->frameIndex, *dataset);
 #endif
 
         // First ComputeShader call -> Calculate DarkChannelPrior + maxAirLight channels for each workgroup
@@ -825,14 +799,13 @@ void VulkanEngineEntryPoint::render() {
 
         vkQueueWaitIdle(engineDevice.graphicsQueue());
 
-        frameIndex += 1;
-#if TIMER_ON
-        fmt::print("--------------------------------------------------------------------------------------------\n");
-#endif
     }
 }
 
 void VulkanEngineEntryPoint::prepareNextFrame() {
+    dataset->vanishingPoint.first *= float(window.getExtent().width) / float(dataset->cameraWidth);
+    dataset->vanishingPoint.second *= float(window.getExtent().height) / float(dataset->cameraHeight);
+
     prepareInputImage();
 
     updateGraphicsUniformBuffers();
@@ -1500,7 +1473,7 @@ void VulkanEngineEntryPoint::handleEvents() {
     if (keystate[SDL_SCANCODE_ESCAPE]) {
         isRunning = false;
     } else if (keystate[SDL_SCANCODE_P]) {
-        saveScreenshot(fmt::format("../screenshots/screenshot_frame_{}.png", frameIndex).c_str());
+        saveScreenshot(fmt::format("../screenshots/screenshot_frame_{}.png", dataset->frameIndex).c_str());
     } else if (keystate[SDL_SCANCODE_A]) {
         isPaused = false;
     } else if (keystate[SDL_SCANCODE_S]) {
@@ -1508,13 +1481,5 @@ void VulkanEngineEntryPoint::handleEvents() {
     } else if (keystate[SDL_SCANCODE_SPACE]) {
         isPaused = false;
         isStepping = true;
-    } else if (keystate[SDL_SCANCODE_LEFT]) {
-        if (frameIndex > SWEEP_FRAMES) {
-            frameIndex -= SWEEP_FRAMES;
-        }
-    } else if (keystate[SDL_SCANCODE_RIGHT]) {
-        if (frameIndex < totalFrames - SWEEP_FRAMES) {
-            frameIndex += SWEEP_FRAMES;
-        }
     }
 }
