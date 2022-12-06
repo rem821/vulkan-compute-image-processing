@@ -67,9 +67,32 @@ public:
         VkPipeline pipeline;
     };
 
-    VulkanEngineEntryPoint(Dataset* dataset);
+    VulkanEngineEntryPoint(Dataset *dataset);
 
-    ~VulkanEngineEntryPoint() = default;
+    ~VulkanEngineEntryPoint() {
+        inputTexture.destroy(engineDevice);
+        darkChannelPriorTexture.destroy(engineDevice);
+        transmissionTexture.destroy(engineDevice);
+        filteredTransmissionTexture.destroy(engineDevice);
+        radianceTexture.destroy(engineDevice);
+
+
+        for (VkShaderModule module: shaderModules) {
+            vkDestroyShaderModule(engineDevice.getDevice(), module, nullptr);
+        }
+
+        for (Compute comp: compute) {
+            vkDestroyDescriptorSetLayout(engineDevice.getDevice(), comp.descriptorSetLayout, nullptr);
+            vkDestroyPipelineLayout(engineDevice.getDevice(), comp.pipelineLayout, nullptr);
+            vkDestroyPipeline(engineDevice.getDevice(), comp.pipeline, nullptr);
+        }
+
+        vkDestroyPipelineLayout(engineDevice.getDevice(), graphics.pipelineLayout, nullptr);
+        vkDestroyPipeline(engineDevice.getDevice(), graphics.pipeline, nullptr);
+
+        vkDestroyDescriptorSetLayout(engineDevice.getDevice(), graphics.descriptorSetLayout, nullptr);
+        vkDestroyDescriptorPool(engineDevice.getDevice(), descriptorPool, nullptr);
+    };
 
     void prepareInputImage();
 
@@ -104,7 +127,7 @@ public:
     void saveScreenshot(const char *filename);
 
     bool isRunning = false; // If set to false, program will end
-    bool isFinished = false; // If set to false, no new data is available and program will stop on last frame
+    bool isFinished = false; // If set to true, no new data is available and program will stop on last frame
     bool isPaused = false; // If set to false program will stop on the current frame and can be then resumed
     bool isStepping = false; // If set to true, program will step one frame and pause
 private:
@@ -153,7 +176,7 @@ private:
     glm::vec2 panPosition = glm::vec2(0.0f, 0.0f);
 
     // DatasetFileReader
-    Dataset* dataset;
+    Dataset *dataset;
 };
 
 

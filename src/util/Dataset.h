@@ -31,7 +31,8 @@ struct Dataset {
     bool isDaylight;
 
     // Visibility calculation
-    std::vector<double> visibility;
+    std::vector<double> vp_visibility;
+    cv::Mat visibility = cv::Mat(DFT_BLOCK_COUNT, DFT_BLOCK_COUNT, CV_32FC1, cv::Scalar(0.0f));
 
     // Glare detection
     cv::Mat histograms = cv::Mat(HISTOGRAM_COUNT * HISTOGRAM_COUNT, HISTOGRAM_BINS, CV_32FC1, cv::Scalar(0.0f));

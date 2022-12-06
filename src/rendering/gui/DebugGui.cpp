@@ -70,8 +70,7 @@ DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset
     window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus;
 
     const ImGuiViewport *main_viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(ImVec2(main_viewport->WorkPos.x + 650, main_viewport->WorkPos.y + 20),
-                            ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2(main_viewport->WorkPos.x + 650, main_viewport->WorkPos.y + 20), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(550, 680), ImGuiCond_FirstUseEver);
 
 
@@ -102,8 +101,8 @@ DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset
     ImGui::TextColored(ImVec4(1, 0, 0, 1), "Position: LAT:%f, LONG:%f, ALT:%f", dataset.latitude, dataset.longitude,
                        dataset.altitude);
     ImGui::TextColored(ImVec4(1, 0, 0, 1), "Azimuth: %f", dataset.azimuth);
-    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Sunrise: %dh %02dmin", int(dataset.sunrise),  int((dataset.sunrise - int(dataset.sunrise)) * 60.0));
-    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Sunset: %dh %02dmin", int(dataset.sunset),  int((dataset.sunset - int(dataset.sunset)) * 60.0));
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Sunrise: %dh %02dmin", int(dataset.sunrise), int((dataset.sunrise - int(dataset.sunrise)) * 60.0));
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Sunset: %dh %02dmin", int(dataset.sunset), int((dataset.sunset - int(dataset.sunset)) * 60.0));
 
     std::vector<double> x(frameIndex);
     std::iota(std::begin(x), std::end(x), 0);
@@ -111,7 +110,7 @@ DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset
         ImPlot::SetupAxis(ImAxis_X1, "Frame", ImPlotAxisFlags_AutoFit);
         ImPlot::SetupAxis(ImAxis_Y1, "Visibility (FFT)", ImPlotAxisFlags_AutoFit);
 
-        ImPlot::PlotLine("", x.data(), dataset.visibility.data(), int(frameIndex), ImPlotLineFlags_NoClip);
+        ImPlot::PlotLine("", x.data(), dataset.vp_visibility.data(), int(frameIndex), ImPlotLineFlags_NoClip);
         ImPlot::EndPlot();
     }
 
@@ -126,6 +125,17 @@ DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset
         ImPlot::EndPlot();
     }
     */
+
+    ImPlot::PushColormap(ImPlotColormap_Plasma);
+    if (ImPlot::BeginPlot("##VisibilityHeatmap")) {
+        static int axesFlags = ImPlotAxisFlags_Lock | ImPlotAxisFlags_NoGridLines | ImPlotAxisFlags_NoTickMarks |
+                               ImPlotAxisFlags_NoLabel | ImPlotAxisFlags_NoTickLabels;
+        ImPlot::SetupAxes(nullptr, nullptr, axesFlags, axesFlags);
+        ImPlot::SetupAxisTicks(ImAxis_X1, 0.0 + 1.0 / DFT_BLOCK_COUNT, 1.0 - 1.0 / DFT_BLOCK_COUNT, DFT_BLOCK_COUNT, nullptr);
+        ImPlot::SetupAxisTicks(ImAxis_Y1, 1.0 - 1.0 / DFT_BLOCK_COUNT, 0.0 + 1.0 / DFT_BLOCK_COUNT, DFT_BLOCK_COUNT, nullptr);
+        ImPlot::PlotHeatmap("", &dataset.visibility.at<double>(0), DFT_BLOCK_COUNT, DFT_BLOCK_COUNT, 0, 1, nullptr, ImPlotPoint(0, 0), ImPlotPoint(1, 1));
+        ImPlot::EndPlot();
+    }
 
     ImPlot::PushColormap(ImPlotColormap_Plasma);
     if (ImPlot::BeginPlot("##GlareHeatmap")) {

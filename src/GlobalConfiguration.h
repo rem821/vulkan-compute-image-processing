@@ -8,7 +8,7 @@
 //  1 --> Work PC (AMD Radeon card)
 //  2 --> Macbook Pro  16" 2019 (AMD Radeon card)
 
-#define DEVICE_TYPE 1
+#define DEVICE_TYPE 2
 
 #if DEVICE_TYPE == 0
 
@@ -99,8 +99,12 @@
 #define OCCLUSION_THRESHOLD 0.0625
 #define OCCLUSION_MIN_FRAMES 100
 
+// DFT BLOCK ANALYSIS
+#define DFT_BLOCK_COUNT 8
+
+
 // Debugging section
-#define TIMER_ON true
+#define TIMER_ON false
 #define RENDERDOC_ENABLED false
 #define DEBUG_GUI_ENABLED true
 

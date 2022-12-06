@@ -55,6 +55,8 @@ VulkanEngineSwapChain::~VulkanEngineSwapChain() {
         vkDestroySemaphore(engineDevice.getDevice(), imageAvailableSemaphores[i], nullptr);
         vkDestroyFence(engineDevice.getDevice(), inFlightFences[i], nullptr);
     }
+
+    vkDestroySemaphore(engineDevice.getDevice(), computeSemaphore, nullptr);
 }
 
 VkFormat VulkanEngineSwapChain::findDepthFormat() {

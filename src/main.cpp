@@ -22,6 +22,15 @@ void runCameraAlgorithms(Dataset *dataset) {
         estimateVanishingPointPosition(dataset);
         calculateVisibility(cameraFrameGray, dataset, dataset->vanishingPoint);
         detectGlareAndOcclusion(cameraFrameGray, dataset);
+
+        for (int j = 0; j < DFT_BLOCK_COUNT; j++) {
+            for (int i = 0; i < DFT_BLOCK_COUNT; i++) {
+                int w = (DFT_WINDOW_SIZE / 2) + (i * ((dataset->cameraWidth - DFT_WINDOW_SIZE) / (DFT_BLOCK_COUNT - 1)));
+                int h = (DFT_WINDOW_SIZE / 2) + (j * ((dataset->cameraHeight - DFT_WINDOW_SIZE) / (DFT_BLOCK_COUNT - 1)));
+
+                calculateVisibility(cameraFrameGray, dataset, std::pair(w, h), std::pair(i, j));
+            }
+        }
     }
 }
 
@@ -37,18 +46,17 @@ int main() {
         rdoc_api->TriggerCapture();
     }
 #endif
-    std::unique_ptr<Dataset> dataset = std::make_unique<Dataset>();
-
-    std::unique_ptr<DatasetFileReader> datasetFileReader = std::make_unique<DatasetFileReader>(dataset.get());
-    std::unique_ptr<VulkanEngineEntryPoint> entryPoint = std::make_unique<VulkanEngineEntryPoint>(dataset.get());
+    auto* dataset = new Dataset();
+    auto* datasetFileReader = new DatasetFileReader(dataset);
+    auto* entryPoint = new VulkanEngineEntryPoint(dataset);
 
     while (entryPoint->isRunning) {
         entryPoint->handleEvents();
         if (!entryPoint->isFinished) {
             if (!entryPoint->isPaused) {
                 if (dataset->frameIndex > 0) {
-                    datasetFileReader->readData();
-                    runCameraAlgorithms(dataset.get());
+                    entryPoint->isFinished = !datasetFileReader->readData();
+                    runCameraAlgorithms(dataset);
                     entryPoint->prepareNextFrame();
                 }
 
@@ -68,5 +76,10 @@ int main() {
             }
         }
     }
+
+    delete entryPoint;
+    delete datasetFileReader;
+    delete dataset;
+
     return 0;
 }

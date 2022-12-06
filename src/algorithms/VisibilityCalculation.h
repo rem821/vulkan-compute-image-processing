@@ -9,7 +9,8 @@
 #include "DatasetFileReader.h"
 #include <fmt/core.h>
 
-void calculateVisibility(const cv::Mat &cameraFrameGray, Dataset *dataset, std::pair<float, float> centerPoint) {
+void calculateVisibility(const cv::Mat &cameraFrameGray, Dataset *dataset, bool isVanishingPoint, std::pair<float, float> centerPoint,
+                         std::pair<int, int> position) {
     Timer timer(fmt::format("Calculating visibility around point: ({}, {})", centerPoint.first, centerPoint.second));
 
     int32_t window_top_left_x = int(centerPoint.first) - (DFT_WINDOW_SIZE / 2);
@@ -78,13 +79,28 @@ void calculateVisibility(const cv::Mat &cameraFrameGray, Dataset *dataset, std::
     std::vector<double> coeffs(3);
     polyfit(freq, pss, coeffs, 2);
 
-    if (dataset->visibility.empty()) dataset->visibility.push_back(1);
-    else
-        dataset->visibility.push_back((1.0 - MOVING_AVERAGE_FORGET_RATE) * dataset->visibility.back() +
-                                      MOVING_AVERAGE_FORGET_RATE * (1 - (MAX_VISIBILITY_THRESHOLD -
-                                                                         min(MAX_VISIBILITY_THRESHOLD,
-                                                                             max(MIN_VISIBILITY_THRESHOLD,
-                                                                                 coeffs[0]))) /
-                                                                        (MAX_VISIBILITY_THRESHOLD -
-                                                                         MIN_VISIBILITY_THRESHOLD)));
+    if (isVanishingPoint) {
+        if (dataset->vp_visibility.empty()) dataset->vp_visibility.push_back(1);
+        else
+            dataset->vp_visibility.push_back((1.0 - MOVING_AVERAGE_FORGET_RATE) * dataset->vp_visibility.back() +
+                                             MOVING_AVERAGE_FORGET_RATE * (1 - (MAX_VISIBILITY_THRESHOLD -
+                                                                                min(MAX_VISIBILITY_THRESHOLD,
+                                                                                    max(MIN_VISIBILITY_THRESHOLD,
+                                                                                        coeffs[0]))) /
+                                                                               (MAX_VISIBILITY_THRESHOLD -
+                                                                                MIN_VISIBILITY_THRESHOLD)));
+    } else {
+        double vis = (1 - (MAX_VISIBILITY_THRESHOLD -
+                           min(MAX_VISIBILITY_THRESHOLD, max(MIN_VISIBILITY_THRESHOLD, coeffs[0]))) /
+                          (MAX_VISIBILITY_THRESHOLD - MIN_VISIBILITY_THRESHOLD));
+        dataset->visibility.at<double>(position.first, position.second) = vis;
+    }
+}
+
+void calculateVisibility(const cv::Mat &cameraFrameGray, Dataset *dataset, std::pair<float, float> centerPoint, std::pair<int, int> position) {
+    calculateVisibility(cameraFrameGray, dataset, false, centerPoint, position);
+}
+
+void calculateVisibility(const cv::Mat &cameraFrameGray, Dataset *dataset, std::pair<float, float> centerPoint) {
+    calculateVisibility(cameraFrameGray, dataset, true, centerPoint, std::pair(-1, -1));
 }

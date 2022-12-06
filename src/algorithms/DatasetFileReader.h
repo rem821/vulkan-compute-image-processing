@@ -77,8 +77,9 @@ public:
         readData();
     }
 
-    void readData() {
+    bool readData() {
         long i = dataset->frameIndex;
+        bool isOk;
 
         // Find IMU positions that corresponds to the actual camera frame timestamp
         do {
@@ -128,10 +129,10 @@ public:
         double h = dataset->hours + (dataset->minutes / 60.0);
         dataset->isDaylight = h < dataset->sunset && h > dataset->sunrise;
 
-        readCameraFrame();
+        isOk = readCameraFrame();
 
         // Save inferred variables
-        if (i <= 0) return;
+        if (i <= 0) return true;
 
         dataset->headingDif.emplace_back(dataset->heading[i - 1] - dataset->heading[i]);
         if (abs(dataset->headingDif.back()) > MAX_HEADING_DIF) {
@@ -142,15 +143,16 @@ public:
             dataset->attitudeDif.back() = 0;
         }
 
+        return isOk;
     }
 
-    void readCameraFrame() {
+    bool readCameraFrame() {
         if (dataset->frameIndex < totalFrames) {
-            {
-                Timer timer("Reading next video frame");
-                video.read(dataset->cameraFrame);
-            }
+            Timer timer("Reading next video frame");
+            bool isOk = video.read(dataset->cameraFrame);
+            return isOk;
         }
+        return false;
     }
 
 private:
