@@ -18,21 +18,17 @@
 class DatasetFileReader {
 public:
     DatasetFileReader(Dataset *_dataset) : dataset(_dataset) {
-        io::CSVReader<1> in_timestamps(std::string(SESSION_PATH) + std::string(TIMESTAMPS_PATH));
-        in_timestamps.read_header(io::ignore_extra_column, "epoch_timestamp");
-
-        long _t;
-        while (in_timestamps.read_row(_t)) {
-            timestamps.emplace_back(_t);
+        io::CSVReader<3> in_timestamps(std::string(SESSION_PATH) + std::string(TIMESTAMPS_PATH));
+        long _timestamp, _frame_index, _camera_timestamp;
+        while (in_timestamps.read_row(_timestamp, _frame_index, _camera_timestamp)) {
+            timestamps.emplace_back(_timestamp);
         }
 
         io::CSVReader<11> in_imu(std::string(SESSION_PATH) + std::string(IMU_PATH));
-        in_imu.read_header(io::ignore_extra_column, "epoch_timestamp", "acc_x", "acc_y", "acc_z", "ang_vel_x",
-                           "ang_vel_y", "ang_vel_z", "quat_x", "quat_y", "quat_z", "quat_w");
         float _acc_x, _acc_y, _acc_z, _ang_vel_x, _ang_vel_y, _ang_vel_z, _quat_x, _quat_y, _quat_z, _quat_w;
-        while (in_imu.read_row(_t, _acc_x, _acc_y, _acc_z, _ang_vel_x, _ang_vel_y, _ang_vel_z, _quat_x, _quat_y,
+        while (in_imu.read_row(_timestamp, _acc_x, _acc_y, _acc_z, _ang_vel_x, _ang_vel_y, _ang_vel_z, _quat_x, _quat_y,
                                _quat_z, _quat_w)) {
-            imu_timestamps.emplace_back(_t);
+            imu_timestamps.emplace_back(_timestamp);
 
             acc_x.emplace_back(_acc_x);
             acc_y.emplace_back(_acc_y);
@@ -49,11 +45,9 @@ public:
         }
 
         io::CSVReader<8> in_time(std::string(SESSION_PATH) + std::string(TIME_PATH));
-        in_time.read_header(io::ignore_extra_column, "epoch_timestamp", "year", "month", "day", "hours", "minutes",
-                            "seconds", "nanoseconds");
         float _year, _month, _day, _hours, _minutes, _seconds, _nanoseconds;
-        while (in_time.read_row(_t, _year, _month, _day, _hours, _minutes, _seconds, _nanoseconds)) {
-            imu_gnss_timestamps.emplace_back(_t);
+        while (in_time.read_row(_timestamp, _year, _month, _day, _hours, _minutes, _seconds, _nanoseconds)) {
+            imu_gnss_timestamps.emplace_back(_timestamp);
 
             year.emplace_back(_year);
             month.emplace_back(_month);
@@ -66,10 +60,9 @@ public:
         }
 
         io::CSVReader<5> in_pose(std::string(SESSION_PATH) + std::string(POSE_PATH));
-        in_pose.read_header(io::ignore_extra_column, "epoch_timestamp", "latitude", "longitude", "altitude", "azimuth");
         float _latitude, _longitude, _altitude, _azimuth;
-        while (in_pose.read_row(_t, _latitude, _longitude, _altitude, _azimuth)) {
-            gnss_timestamps.emplace_back(_t);
+        while (in_pose.read_row(_timestamp, _latitude, _longitude, _altitude, _azimuth)) {
+            gnss_timestamps.emplace_back(_timestamp);
 
             latitude.emplace_back(_latitude);
             longitude.emplace_back(_longitude);
