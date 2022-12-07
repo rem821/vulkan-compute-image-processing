@@ -8,7 +8,7 @@
 //  1 --> Work PC (AMD Radeon card)
 //  2 --> Macbook Pro  16" 2019 (AMD Radeon card)
 
-#define DEVICE_TYPE 2
+#define DEVICE_TYPE 1
 
 #if DEVICE_TYPE == 0
 
@@ -32,7 +32,7 @@
 
 // Content section
 #define VIDEO_DOWNSCALE_FACTOR 1
-#define SESSION_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_1/"
+#define SESSION_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_4_3/"
 #define IMAGE_PATH "../assets/image.jpg"
 
 // Shaders section
@@ -62,7 +62,6 @@
 #define SINGLE_VIEW_MODE true
 
 #define TIMEZONE_OFFSET 1
-#define SWEEP_FRAMES 40
 
 #define DARK_CHANNEL_PRIOR_SHADER "ImageDarkChannelPrior"
 #define TRANSMISSION_SHADER "ImageTransmission"
@@ -102,9 +101,8 @@
 // DFT BLOCK ANALYSIS
 #define DFT_BLOCK_COUNT 8
 
-
 // Debugging section
-#define TIMER_ON false
+#define TIMER_ON true
 #define RENDERDOC_ENABLED false
 #define DEBUG_GUI_ENABLED true
 
