@@ -12,7 +12,7 @@
 #include <fmt/core.h>
 #include <vector>
 
-VulkanEngineEntryPoint::VulkanEngineEntryPoint(Dataset* _dataset): dataset(_dataset) {
+VulkanEngineEntryPoint::VulkanEngineEntryPoint(Dataset *_dataset) : dataset(_dataset) {
 
     // Init resources
     prepareInputImage();
@@ -59,7 +59,6 @@ void VulkanEngineEntryPoint::prepareInputImage() {
     cv::Mat rgba;
 
     cv::cvtColor(dataset->cameraFrame, rgba, cv::COLOR_BGR2RGBA);
-
 
 
     inputTexture.fromImageFile(rgba.data, rgba.cols * rgba.rows * rgba.channels(), VK_FORMAT_R8G8B8A8_UNORM,
@@ -803,8 +802,10 @@ void VulkanEngineEntryPoint::render() {
 }
 
 void VulkanEngineEntryPoint::prepareNextFrame() {
-    dataset->vanishingPoint.first *= float(window.getExtent().width) / float(dataset->cameraWidth);
-    dataset->vanishingPoint.second *= float(window.getExtent().height) / float(dataset->cameraHeight);
+    dataset->vanishingPoint.first = int(
+            float(dataset->vanishingPoint.first * window.getExtent().width) / float(dataset->cameraWidth));
+    dataset->vanishingPoint.second = int(
+            float(dataset->vanishingPoint.second * window.getExtent().height) / float(dataset->cameraHeight));
 
     prepareInputImage();
 

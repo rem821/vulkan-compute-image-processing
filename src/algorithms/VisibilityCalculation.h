@@ -12,20 +12,31 @@
 class VisibilityCalculation {
 public:
     static void
-    calculateVisibility(const cv::Mat &cameraFrameGray, Dataset *dataset, std::pair<float, float> centerPoint,
+    calculateVisibility(const cv::Mat &cameraFrameGray, Dataset *dataset, std::pair<int, int> centerPoint,
                         std::pair<int, int> position) {
         _calculateVisibility(cameraFrameGray, dataset, false, centerPoint, position);
     }
 
     static void
-    calculateVisibilityVp(const cv::Mat &cameraFrameGray, Dataset *dataset, std::pair<float, float> centerPoint) {
+    calculateVisibilityVp(const cv::Mat &cameraFrameGray, Dataset *dataset, std::pair<int, int> centerPoint) {
         Timer timer("Calculating vanishing point visibility");
         _calculateVisibility(cameraFrameGray, dataset, true, centerPoint, std::pair(-1, -1));
     }
 
+    static void calculateVisibilityScore(Dataset *dataset) {
+        float sum = 0.0f;
+        for (int j = 0; j < DFT_BLOCK_COUNT; j++) {
+            for (int i = 0; i < DFT_BLOCK_COUNT; i++) {
+                sum += dataset->visibility.at<float>(i, j);
+            }
+        }
+        float score = sum / (DFT_BLOCK_COUNT * DFT_BLOCK_COUNT);
+        dataset->visibilityScore = score < 0.2 ? 1 : 0;
+    }
+
 private:
     static void _calculateVisibility(const cv::Mat &cameraFrameGray, Dataset *dataset, bool isVanishingPoint,
-                                     std::pair<float, float> centerPoint,
+                                     std::pair<int, int> centerPoint,
                                      std::pair<int, int> position) {
         int32_t window_top_left_x = int(centerPoint.first) - (DFT_WINDOW_SIZE / 2);
         int32_t window_top_left_y = int(centerPoint.second) - (DFT_WINDOW_SIZE / 2);

@@ -107,6 +107,9 @@ DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset
     ImGui::TextColored(ImVec4(1, 0, 0, 1), "Sunset: %dh %02dmin", int(dataset.sunset),
                        int((dataset.sunset - int(dataset.sunset)) * 60.0));
 
+    ImGui::Text(" ");
+
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Fogged: %d", int(dataset.visibilityScore));
     std::vector<double> x(frameIndex);
     std::iota(std::begin(x), std::end(x), 0);
     if (ImPlot::BeginPlot("##Visibility (FFT)")) {

@@ -25,7 +25,7 @@ struct Dataset {
     std::vector<double> attitude;
     std::vector<double> attitudeDif;
 
-    std::pair<float, float> vanishingPoint{};
+    std::pair<int, int> vanishingPoint{};
 
     double sunrise, sunset;
     bool isDaylight;
@@ -33,6 +33,7 @@ struct Dataset {
     // Visibility calculation
     std::vector<double> vp_visibility;
     cv::Mat visibility = cv::Mat(DFT_BLOCK_COUNT, DFT_BLOCK_COUNT, CV_32FC1, cv::Scalar(0.0f));
+    double visibilityScore = 0.0;
 
     // Glare detection
     cv::Mat histograms = cv::Mat(HISTOGRAM_COUNT * HISTOGRAM_COUNT, HISTOGRAM_BINS, CV_32FC1, cv::Scalar(0.0f));

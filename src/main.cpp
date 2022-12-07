@@ -43,6 +43,7 @@ void runCameraAlgorithms(Dataset *dataset, BS::thread_pool &pool) {
             Timer timer("Calculating visibility of multiple points asynchronously");
             while (pool.get_tasks_running() > 0);
         }
+        VisibilityCalculation::calculateVisibilityScore(dataset);
     }
 }
 
