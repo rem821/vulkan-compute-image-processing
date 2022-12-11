@@ -6,11 +6,12 @@
 #include "GlobalConfiguration.h"
 #include "util/Dataset.h"
 #include "../external/renderdoc/renderdoc_app.h"
-#include "algorithms/DatasetFileReader.h"
 
+#include "algorithms/DatasetFileReader.h"
 #include "algorithms/VisibilityCalculation.h"
 #include "algorithms/GlareAndOcclusionDetection.h"
 #include "algorithms/VanishingPointEstimation.h"
+#include "algorithms/GeometryAssertion.h"
 
 #include "threading/BS_thread_pool.h"
 
@@ -18,14 +19,19 @@ RENDERDOC_API_1_1_2 *rdoc_api = nullptr;
 
 void runCameraAlgorithms(Dataset *dataset, BS::thread_pool &pool) {
     if (dataset != nullptr && dataset->frameIndex != 0) {
-        cv::Mat cameraFrameGray;
-        cv::cvtColor(dataset->cameraFrame, cameraFrameGray, cv::COLOR_BGR2GRAY);
+        Timer tmr("Running all camera CPU algorithms");
+
+        cv::Mat leftCameraFrameGray;
+        cv::Mat rightCameraFrameGray;
+        cv::cvtColor(dataset->leftCameraFrame, leftCameraFrameGray, cv::COLOR_BGR2GRAY);
+        cv::cvtColor(dataset->rightCameraFrame, rightCameraFrameGray, cv::COLOR_BGR2GRAY);
 
         estimateVanishingPointPosition(dataset);
-        VisibilityCalculation::calculateVisibilityVp(cameraFrameGray, dataset, dataset->vanishingPoint);
-        detectGlareAndOcclusion(cameraFrameGray, dataset);
 
-        pool.paused = true;
+        // Algorithms run in parallel pool
+        pool.push_task(VisibilityCalculation::calculateVisibilityVp, leftCameraFrameGray, dataset, dataset->vanishingPoint);
+        pool.push_task(detectGlareAndOcclusion, leftCameraFrameGray, dataset);
+
         for (int j = 0; j < DFT_BLOCK_COUNT; j++) {
             for (int i = 0; i < DFT_BLOCK_COUNT; i++) {
                 int w = (DFT_WINDOW_SIZE / 2) +
@@ -33,17 +39,17 @@ void runCameraAlgorithms(Dataset *dataset, BS::thread_pool &pool) {
                 int h = (DFT_WINDOW_SIZE / 2) +
                         (j * ((dataset->cameraHeight - DFT_WINDOW_SIZE) / (DFT_BLOCK_COUNT - 1)));
 
-                pool.push_task(VisibilityCalculation::calculateVisibility, cameraFrameGray, dataset, std::pair(w, h),
+                pool.push_task(VisibilityCalculation::calculateVisibility, leftCameraFrameGray, dataset, std::pair(w, h),
                                std::pair(i, j));
             }
         }
-        pool.paused = false;
 
         {
             Timer timer("Calculating visibility of multiple points asynchronously");
             while (pool.get_tasks_running() > 0);
         }
         VisibilityCalculation::calculateVisibilityScore(dataset);
+        assertCameraGeometry(dataset, leftCameraFrameGray, rightCameraFrameGray);
     }
 }
 
@@ -63,7 +69,7 @@ int main() {
     BS::thread_pool pool(std::thread::hardware_concurrency() - 1);
 
     auto *dataset = new Dataset();
-    auto *datasetFileReader = new DatasetFileReader(dataset);
+    auto *datasetFileReader = new DatasetFileReader(dataset, pool);
     auto *entryPoint = new VulkanEngineEntryPoint(dataset);
 
     while (entryPoint->isRunning) {
@@ -71,7 +77,7 @@ int main() {
         if (!entryPoint->isFinished) {
             if (!entryPoint->isPaused) {
                 if (dataset->frameIndex > 0) {
-                    entryPoint->isFinished = !datasetFileReader->readData();
+                    entryPoint->isFinished = !datasetFileReader->readData(pool);
                     runCameraAlgorithms(dataset, pool);
                     entryPoint->prepareNextFrame();
                 }

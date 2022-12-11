@@ -14,10 +14,11 @@
 #include "../util/Dataset.h"
 #include "../profiling/Timer.h"
 
+#include "../threading/BS_thread_pool.h"
 
 class DatasetFileReader {
 public:
-    DatasetFileReader(Dataset *_dataset) : dataset(_dataset) {
+    DatasetFileReader(Dataset *_dataset, BS::thread_pool &pool) : dataset(_dataset) {
         io::CSVReader<3> in_timestamps(std::string(SESSION_PATH) + std::string(TIMESTAMPS_PATH));
         long _timestamp, _frame_index, _camera_timestamp;
         while (in_timestamps.read_row(_timestamp, _frame_index, _camera_timestamp)) {
@@ -74,10 +75,10 @@ public:
             dataset->occlusionBuffers.emplace_back(OCCLUSION_MIN_FRAMES);
         }
 
-        readData();
+        readData(pool);
     }
 
-    bool readData() {
+    bool readData(BS::thread_pool &pool) {
         long i = dataset->frameIndex;
         bool isOk;
 
@@ -129,7 +130,7 @@ public:
         double h = dataset->hours + (dataset->minutes / 60.0);
         dataset->isDaylight = h < dataset->sunset && h > dataset->sunrise;
 
-        isOk = readCameraFrame();
+        isOk = readCameraFrame(pool);
 
         // Save inferred variables
         if (i <= 0) return true;
@@ -146,11 +147,16 @@ public:
         return isOk;
     }
 
-    bool readCameraFrame() {
+    bool readCameraFrame(BS::thread_pool &pool) {
         if (dataset->frameIndex < totalFrames) {
             Timer timer("Reading next video frame");
-            bool isOk = video.read(dataset->cameraFrame);
-            return isOk;
+
+            // Doesn't update the variable for some reason
+            //pool.push_task(&cv::VideoCapture::read, &leftVideo, dataset->leftCameraFrame);
+            //pool.push_task(&cv::VideoCapture::read, &rightVideo, dataset->rightCameraFrame);
+            //while (pool.get_tasks_running() > 0);
+
+            return leftVideo.read(dataset->leftCameraFrame) && rightVideo.read(dataset->rightCameraFrame);
         }
         return false;
     }
@@ -174,8 +180,10 @@ private:
     long previousTimeDif = INT_MAX;
 
     // Camera
-    cv::VideoCapture video{std::string(SESSION_PATH) + std::string(VIDEO_PATH)};
-    double totalFrames = video.get(cv::CAP_PROP_FRAME_COUNT);
+    cv::VideoCapture leftVideo{std::string(SESSION_PATH) + std::string(LEFT_VIDEO_PATH)};
+    cv::VideoCapture rightVideo{std::string(SESSION_PATH) + std::string(RIGHT_VIDEO_PATH)};
+
+    double totalFrames = leftVideo.get(cv::CAP_PROP_FRAME_COUNT);
 };
 
 

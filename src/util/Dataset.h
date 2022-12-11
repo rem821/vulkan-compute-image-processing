@@ -16,7 +16,8 @@ struct Dataset {
 
     // Camera
     uint32_t frameIndex = 0;
-    cv::Mat cameraFrame{};
+    cv::Mat leftCameraFrame{};
+    cv::Mat rightCameraFrame{};
 
     // Inferred variables
     std::vector<double> heading;

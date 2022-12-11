@@ -32,7 +32,7 @@
 
 // Content section
 #define VIDEO_DOWNSCALE_FACTOR 1
-#define SESSION_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_4_1/"
+#define SESSION_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_1/"
 #define IMAGE_PATH "../assets/image.jpg"
 
 // Shaders section
@@ -70,7 +70,8 @@
 #define RADIANCE_SHADER "ImageRadiance"
 
 // Files
-#define VIDEO_PATH "camera_left_front/video.mp4"
+#define LEFT_VIDEO_PATH "camera_left_front/video.mp4"
+#define RIGHT_VIDEO_PATH "camera_right_front/video.mp4"
 #define TIMESTAMPS_PATH "camera_left_front/timestamps.txt"
 #define IMU_PATH "imu/imu.txt"
 #define TIME_PATH "gnss/time.txt"
@@ -99,7 +100,7 @@
 #define OCCLUSION_MIN_FRAMES 100
 
 // DFT BLOCK ANALYSIS
-#define DFT_BLOCK_COUNT 8
+#define DFT_BLOCK_COUNT 4
 
 // Debugging section
 #define TIMER_ON true

@@ -58,7 +58,7 @@ void VulkanEngineEntryPoint::prepareInputImage() {
     Timer timer("Generating texture from input image");
     cv::Mat rgba;
 
-    cv::cvtColor(dataset->cameraFrame, rgba, cv::COLOR_BGR2RGBA);
+    cv::cvtColor(dataset->leftCameraFrame, rgba, cv::COLOR_BGR2RGBA);
 
 
     inputTexture.fromImageFile(rgba.data, rgba.cols * rgba.rows * rgba.channels(), VK_FORMAT_R8G8B8A8_UNORM,
