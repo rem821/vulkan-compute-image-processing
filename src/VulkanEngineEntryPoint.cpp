@@ -162,8 +162,19 @@ void VulkanEngineEntryPoint::updateGraphicsUniformBuffers() {
     memcpy(uniformBufferVertexShader->getMappedMemory(), &uboVertexShader, sizeof(uboVertexShader));
 
     if (dataset != nullptr) {
+        uboFragmentShader.showVanishingPoint = false;
+        uboFragmentShader.showKeypoints = true;
         uboFragmentShader.vanishingPoint = glm::vec3(dataset->vanishingPoint.first, dataset->vanishingPoint.second,
                                                      DFT_WINDOW_SIZE);
+        int i = 0;
+        float x_ratio = float(window.getExtent().width) / float(dataset->cameraWidth);
+        float y_ratio =  float(window.getExtent().height) / float(dataset->cameraHeight);
+        for (const auto &point: dataset->leftKeypoints) {
+            float x = point.pt.x * x_ratio;
+            float y = point.pt.y * y_ratio;
+            uboFragmentShader.keyPoints[i] = glm::vec2(x, y);
+            i++;
+        }
     }
 
     memcpy(uniformBufferFragmentShader->getMappedMemory(), &uboFragmentShader, sizeof(uboFragmentShader));
@@ -594,7 +605,7 @@ void VulkanEngineEntryPoint::render() {
         // Record compute command buffer
 
 #if DEBUG_GUI_ENABLED
-        debugGui.showWindow(window.sdlWindow(), dataset->frameIndex, *dataset);
+        bool shouldRender = debugGui.showWindow(window.sdlWindow(), dataset->frameIndex, *dataset);
 #endif
 
         // First ComputeShader call -> Calculate DarkChannelPrior + maxAirLight channels for each workgroup
@@ -790,7 +801,7 @@ void VulkanEngineEntryPoint::render() {
 #endif
 
 #if DEBUG_GUI_ENABLED
-        debugGui.render(bufferPair.graphicsCommandBuffer);
+        if (shouldRender) debugGui.render(bufferPair.graphicsCommandBuffer);
 #endif
 
         renderer.endSwapChainRenderPass(bufferPair.graphicsCommandBuffer);

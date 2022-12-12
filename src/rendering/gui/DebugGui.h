@@ -28,7 +28,7 @@ public:
 
     DebugGui &operator=(const DebugGui &) = delete;
 
-    void showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset);
+    bool showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset);
 
     void render(VkCommandBuffer &commandBuffer);
 

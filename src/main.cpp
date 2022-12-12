@@ -29,27 +29,33 @@ void runCameraAlgorithms(Dataset *dataset, BS::thread_pool &pool) {
         estimateVanishingPointPosition(dataset);
 
         // Algorithms run in parallel pool
-        pool.push_task(VisibilityCalculation::calculateVisibilityVp, leftCameraFrameGray, dataset, dataset->vanishingPoint);
+        pool.push_task(VisibilityCalculation::calculateVisibilityVp, leftCameraFrameGray, dataset,
+                       dataset->vanishingPoint);
         pool.push_task(detectGlareAndOcclusion, leftCameraFrameGray, dataset);
-
-        for (int j = 0; j < DFT_BLOCK_COUNT; j++) {
-            for (int i = 0; i < DFT_BLOCK_COUNT; i++) {
-                int w = (DFT_WINDOW_SIZE / 2) +
-                        (i * ((dataset->cameraWidth - DFT_WINDOW_SIZE) / (DFT_BLOCK_COUNT - 1)));
-                int h = (DFT_WINDOW_SIZE / 2) +
-                        (j * ((dataset->cameraHeight - DFT_WINDOW_SIZE) / (DFT_BLOCK_COUNT - 1)));
-
-                pool.push_task(VisibilityCalculation::calculateVisibility, leftCameraFrameGray, dataset, std::pair(w, h),
-                               std::pair(i, j));
-            }
-        }
 
         {
             Timer timer("Calculating visibility of multiple points asynchronously");
-            while (pool.get_tasks_running() > 0);
+            for (int j = 0; j < DFT_BLOCK_COUNT; j++) {
+                for (int i = 0; i < DFT_BLOCK_COUNT; i++) {
+                    int w = (DFT_WINDOW_SIZE / 2) +
+                            (i * ((dataset->cameraWidth - DFT_WINDOW_SIZE) / (DFT_BLOCK_COUNT - 1)));
+                    int h = (DFT_WINDOW_SIZE / 2) +
+                            (j * ((dataset->cameraHeight - DFT_WINDOW_SIZE) / (DFT_BLOCK_COUNT - 1)));
+
+                    pool.push_task(VisibilityCalculation::calculateVisibility, leftCameraFrameGray, dataset,
+                                   std::pair(w, h),
+                                   std::pair(i, j));
+                }
+            }
+            pool.wait_for_tasks();
         }
+
+        {
+            Timer timer("Assert camera geometry");
+            assertCameraGeometry(dataset, leftCameraFrameGray, rightCameraFrameGray, pool);
+        }
+
         VisibilityCalculation::calculateVisibilityScore(dataset);
-        assertCameraGeometry(dataset, leftCameraFrameGray, rightCameraFrameGray);
     }
 }
 
@@ -93,7 +99,8 @@ int main() {
 #endif
                 dataset->frameIndex++;
 #if TIMER_ON
-                fmt::print("--------------------------------------------------------------------------------------------\n");
+                fmt::print(
+                        "--------------------------------------------------------------------------------------------\n");
 #endif
             }
         }

@@ -99,7 +99,14 @@
 #define OCCLUSION_MIN_FRAMES 100
 
 // DFT BLOCK ANALYSIS
-#define DFT_BLOCK_COUNT 4
+#define DFT_BLOCK_COUNT 8
+
+// SHI-TOMASI
+#define SHI_TOMASI_MAX_CORNERS 150 // Don't forget to mirror this setting into texture.frag shader
+#define SHI_TOMASI_QUALITY_LEVEL 0.1
+#define SHI_TOMASI_MIN_DISTANCE 1
+#define SHI_TOMASI_BLOCK_SIZE 3
+#define SHI_TOMASI_GRADIENT_SIZE 3
 
 // Debugging section
 #define TIMER_ON true

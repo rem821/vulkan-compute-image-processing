@@ -40,4 +40,12 @@ struct Dataset {
     cv::Mat histograms = cv::Mat(HISTOGRAM_COUNT * HISTOGRAM_COUNT, HISTOGRAM_BINS, CV_32FC1, cv::Scalar(0.0f));
     cv::Mat glareAmounts = cv::Mat(HISTOGRAM_COUNT, HISTOGRAM_COUNT, CV_32FC1, cv::Scalar(0.0f));
     std::vector<CircularBuffer<bool>> occlusionBuffers;
+
+    // Shi-Tomasi
+    std::vector<cv::KeyPoint> leftKeypoints;
+    cv::Mat leftDescriptors;
+
+    std::vector<cv::KeyPoint> rightKeypoints;
+    cv::Mat rightDescriptors;
+
 };
