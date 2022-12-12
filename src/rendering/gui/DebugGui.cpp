@@ -54,7 +54,7 @@ DebugGui::~DebugGui() {
     ImGui_ImplVulkan_Shutdown();
 }
 
-void
+bool
 DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset) {
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplSDL2_NewFrame(window);
@@ -62,10 +62,7 @@ DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset
     ImGui::NewFrame();
 
     ImGuiWindowFlags window_flags = 0;
-    window_flags |= ImGuiWindowFlags_NoTitleBar;
-    window_flags |= ImGuiWindowFlags_NoScrollbar;
     window_flags |= ImGuiWindowFlags_MenuBar;
-    window_flags |= ImGuiWindowFlags_NoNav;
     window_flags |= ImGuiWindowFlags_NoBackground;
     window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus;
 
@@ -78,7 +75,9 @@ DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset
     if (!ImGui::Begin("Runtime info", nullptr, window_flags)) {
         // Early out if the window is collapsed, as an optimization.
         ImGui::End();
-        return;
+        ImGui::EndFrame();
+
+        return false;
     }
 
     // Frame index
@@ -163,6 +162,7 @@ DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset
     ImGui::End();
 
     ImGui::Render();
+    return true;
 }
 
 void DebugGui::render(VkCommandBuffer &commandBuffer) {

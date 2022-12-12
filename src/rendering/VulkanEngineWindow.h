@@ -26,7 +26,7 @@ public:
         height_ = height;
     }
 
-    bool wasWindowResized() { return frameBufferResized; };
+    [[nodiscard]] bool wasWindowResized() const { return frameBufferResized; };
 
     void resetWindowsResizedFlag() { frameBufferResized = false; };
 
@@ -34,8 +34,8 @@ public:
 private:
     void initWindow();
 
-    uint32_t width_;
-    uint32_t height_;
+    uint32_t width_ = 0;
+    uint32_t height_ = 0;
     bool frameBufferResized = false;
 
     const char *windowName;

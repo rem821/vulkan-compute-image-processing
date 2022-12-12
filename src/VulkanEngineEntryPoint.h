@@ -36,7 +36,10 @@ public:
     } uboVertexShader{};
 
     struct {
-        glm::vec3 vanishingPoint;
+        alignas(4) glm::int32_t showVanishingPoint;
+        alignas(4) glm::int32_t showKeypoints;
+        alignas(16) glm::vec3 vanishingPoint;
+        alignas(8) glm::vec2 keyPoints[SHI_TOMASI_MAX_CORNERS];
     } uboFragmentShader{};
 
     struct {
@@ -44,7 +47,7 @@ public:
         glm::int32_t imageWidth;
         glm::int32_t imageHeight;
         glm::float32_t omega;
-        alignas(32) glm::float32_t epsilon;
+        alignas(4) glm::float32_t epsilon;
     } computePushConstant{};
 
     struct {
@@ -67,7 +70,7 @@ public:
         VkPipeline pipeline;
     };
 
-    VulkanEngineEntryPoint(Dataset *dataset);
+    explicit VulkanEngineEntryPoint(Dataset *dataset);
 
     ~VulkanEngineEntryPoint() {
         inputTexture.destroy(engineDevice);
