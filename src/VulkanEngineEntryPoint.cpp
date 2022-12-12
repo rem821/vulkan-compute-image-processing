@@ -1361,8 +1361,21 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
     vkMapMemory(engineDevice.getDevice(), dstImageMemory, 0, VK_WHOLE_SIZE, 0, (void **) &data);
     data += subResourceLayout.offset;
 
-    stbi_write_png(filename, int(width), int(height), int(channels), data, 0);
+#if DEVICE_TYPE == 2
+    size_t size = width * height * channels;
 
+    auto *dataRgb = new uint8_t[size];
+    for (size_t i = 0; i < size; i += channels) {
+        dataRgb[i + 0] = data[i + 2];
+        dataRgb[i + 1] = data[i + 1];
+        dataRgb[i + 2] = data[i + 0];
+        dataRgb[i + 3] = data[i + 3];
+    }
+
+    stbi_write_png(filename, int(width), int(height), int(channels), dataRgb, 0);
+#else
+    stbi_write_png(filename, int(width), int(height), int(channels), data, 0);
+#endif
     fmt::print("Screenshot saved to disk\n");
 
     // Clean up resources

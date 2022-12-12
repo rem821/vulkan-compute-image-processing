@@ -47,7 +47,6 @@
 // Content section
 #define VIDEO_DOWNSCALE_FACTOR 1
 #define SESSION_PATH "/Users/stanislavsvediroh/Downloads/1_1_1_1/"
-#define IMAGE_PATH "../assets/haze.jpg"
 
 // Shaders section
 #define WORKGROUP_COUNT 24
