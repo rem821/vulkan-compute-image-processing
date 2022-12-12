@@ -41,11 +41,10 @@ struct Dataset {
     cv::Mat glareAmounts = cv::Mat(HISTOGRAM_COUNT, HISTOGRAM_COUNT, CV_32FC1, cv::Scalar(0.0f));
     std::vector<CircularBuffer<bool>> occlusionBuffers;
 
-    // Shi-Tomasi
+    // Keypoint detection
     std::vector<cv::KeyPoint> leftKeypoints;
     cv::Mat leftDescriptors;
-
     std::vector<cv::KeyPoint> rightKeypoints;
     cv::Mat rightDescriptors;
-
+    bool geometryOk;
 };

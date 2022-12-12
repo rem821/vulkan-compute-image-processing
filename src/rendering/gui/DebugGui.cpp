@@ -108,7 +108,9 @@ DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset
 
     ImGui::Text(" ");
 
-    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Fogged: %d", int(dataset.visibilityScore));
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Fog: %d", int(dataset.visibilityScore));
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Camera geometry: %d", int(dataset.geometryOk));
+
     std::vector<double> x(frameIndex);
     std::iota(std::begin(x), std::end(x), 0);
     if (ImPlot::BeginPlot("##Visibility (FFT)")) {
@@ -123,10 +125,9 @@ DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset
     if (ImPlot::BeginPlot("##Histogram")) {
         ImPlot::SetupAxis(ImAxis_Y1, "Count", ImPlotAxisFlags_AutoFit);
         ImPlot::SetupAxis(ImAxis_X1, "Bin", 0);
-        ImPlot::SetupAxisLimits(ImAxis_X1, 0, HISTOGRAM_BINS);
+        ImPlot::SetupAxisLimits(ImAxis_X1, 0, KEYPOINT_HIST_BINS);
 
-        const float *xData = &histograms.at<float>(0, 0);
-        ImPlot::PlotBars("", xData, HISTOGRAM_BINS);
+        ImPlot::PlotBars("", dataset.y_dists.data(), KEYPOINT_HIST_BINS);
         ImPlot::EndPlot();
     }
     */
