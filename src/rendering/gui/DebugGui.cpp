@@ -54,30 +54,32 @@ DebugGui::~DebugGui() {
     ImGui_ImplVulkan_Shutdown();
 }
 
-bool
-DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset) {
+void DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset *dataset) {
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplSDL2_NewFrame(window);
 
     ImGui::NewFrame();
-
-    ImGuiWindowFlags window_flags = 0;
-    window_flags |= ImGuiWindowFlags_MenuBar;
-    window_flags |= ImGuiWindowFlags_NoBackground;
-    window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus;
 
     const ImGuiViewport *main_viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(ImVec2(main_viewport->WorkPos.x + 650, main_viewport->WorkPos.y + 20),
                             ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(550, 680), ImGuiCond_FirstUseEver);
 
+    showGraphs(frameIndex, dataset);
+    showStats(frameIndex, dataset);
+
+    ImGui::Render();
+}
+
+void DebugGui::showGraphs(long frameIndex, const Dataset *dataset) {
+    ImGuiWindowFlags window_flags = 0;
+    window_flags |= ImGuiWindowFlags_MenuBar;
+    window_flags |= ImGuiWindowFlags_NoBackground;
+    window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus;
 
     if (!ImGui::Begin("Runtime info", nullptr, window_flags)) {
         // Early out if the window is collapsed, as an optimization.
         ImGui::End();
-        ImGui::EndFrame();
-
-        return false;
     }
 
     // Frame index
@@ -94,28 +96,28 @@ DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset
 
     ImGui::Text(" ");
 
-    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Time: %02d.%02d.%d %02d:%02d:%02d", dataset.day, dataset.month,
-                       dataset.year,
-                       dataset.hours, dataset.minutes, dataset.seconds);
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Time: %02d.%02d.%d %02d:%02d:%02d", dataset->day, dataset->month,
+                       dataset->year,
+                       dataset->hours, dataset->minutes, dataset->seconds);
 
-    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Position: LAT:%f, LONG:%f, ALT:%f", dataset.latitude, dataset.longitude,
-                       dataset.altitude);
-    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Azimuth: %f", dataset.azimuth);
-    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Sunrise: %dh %02dmin", int(dataset.sunrise),
-                       int((dataset.sunrise - int(dataset.sunrise)) * 60.0));
-    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Sunset: %dh %02dmin", int(dataset.sunset),
-                       int((dataset.sunset - int(dataset.sunset)) * 60.0));
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Position: LAT:%f, LONG:%f, ALT:%f", dataset->latitude, dataset->longitude,
+                       dataset->altitude);
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Azimuth: %f", dataset->azimuth);
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Sunrise: %dh %02dmin", int(dataset->sunrise),
+                       int((dataset->sunrise - int(dataset->sunrise)) * 60.0));
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Sunset: %dh %02dmin", int(dataset->sunset),
+                       int((dataset->sunset - int(dataset->sunset)) * 60.0));
 
     ImGui::Text(" ");
 
-    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Fogged: %d", int(dataset.visibilityScore));
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Fogged: %d", int(dataset->visibilityScore));
     std::vector<double> x(frameIndex);
     std::iota(std::begin(x), std::end(x), 0);
     if (ImPlot::BeginPlot("##Visibility (FFT)")) {
         ImPlot::SetupAxis(ImAxis_X1, "Frame", ImPlotAxisFlags_AutoFit);
         ImPlot::SetupAxis(ImAxis_Y1, "Visibility (FFT)", ImPlotAxisFlags_AutoFit);
 
-        ImPlot::PlotLine("", x.data(), dataset.vp_visibility.data(), int(frameIndex), ImPlotLineFlags_NoClip);
+        ImPlot::PlotLine("", x.data(), dataset->vp_visibility.data(), int(frameIndex), ImPlotLineFlags_NoClip);
         ImPlot::EndPlot();
     }
 
@@ -140,7 +142,7 @@ DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset
                                nullptr);
         ImPlot::SetupAxisTicks(ImAxis_Y1, 1.0 - 1.0 / DFT_BLOCK_COUNT, 0.0 + 1.0 / DFT_BLOCK_COUNT, DFT_BLOCK_COUNT,
                                nullptr);
-        ImPlot::PlotHeatmap("", &dataset.visibility.at<float>(0), DFT_BLOCK_COUNT, DFT_BLOCK_COUNT, 0, 1, nullptr,
+        ImPlot::PlotHeatmap("", &dataset->visibility.at<float>(0), DFT_BLOCK_COUNT, DFT_BLOCK_COUNT, 0, 1, nullptr,
                             ImPlotPoint(0, 0), ImPlotPoint(1, 1), ImPlotHeatmapFlags_ColMajor);
         ImPlot::EndPlot();
     }
@@ -154,19 +156,26 @@ DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset &dataset
                                nullptr);
         ImPlot::SetupAxisTicks(ImAxis_Y1, 1.0 - 1.0 / HISTOGRAM_COUNT, 0.0 + 1.0 / HISTOGRAM_COUNT, HISTOGRAM_COUNT,
                                nullptr);
-        ImPlot::PlotHeatmap("", &dataset.glareAmounts.at<float>(0), HISTOGRAM_COUNT, HISTOGRAM_COUNT, 0, 256, nullptr,
+        ImPlot::PlotHeatmap("", &dataset->glareAmounts.at<float>(0), HISTOGRAM_COUNT, HISTOGRAM_COUNT, 0, 256, nullptr,
                             ImPlotPoint(0, 0), ImPlotPoint(1, 1), ImPlotHeatmapFlags_ColMajor);
         ImPlot::EndPlot();
     }
 
     ImGui::End();
+    hasSomethingToRender = true;
+}
 
-    ImGui::Render();
-    return true;
+void DebugGui::showStats(long frameIndex, const Dataset *dataset) {
+
 }
 
 void DebugGui::render(VkCommandBuffer &commandBuffer) {
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+    if(hasSomethingToRender) {
+        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+    } else {
+        ImGui::EndFrame();
+    }
+    hasSomethingToRender = false;
 }
 
 void DebugGui::processEvent(SDL_Event event) {

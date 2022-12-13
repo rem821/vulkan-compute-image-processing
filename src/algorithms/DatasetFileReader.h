@@ -19,10 +19,18 @@
 class DatasetFileReader {
 public:
     DatasetFileReader(Dataset *_dataset, BS::thread_pool &pool) : dataset(_dataset) {
-        io::CSVReader<3> in_timestamps(std::string(SESSION_PATH) + std::string(TIMESTAMPS_PATH));
+        io::CSVReader<3> in_camera_timestamps(std::string(SESSION_PATH) + std::string(CAMERA_TIMESTAMPS_PATH));
         long _timestamp, _frame_index, _camera_timestamp;
-        while (in_timestamps.read_row(_timestamp, _frame_index, _camera_timestamp)) {
+        while (in_camera_timestamps.read_row(_timestamp, _frame_index, _camera_timestamp)) {
             timestamps.emplace_back(_timestamp);
+        }
+
+        io::CSVReader<4> in_thermal_timestamps(std::string(SESSION_PATH) + std::string(THERMAL_TIMESTAMPS_PATH));
+        double _min_temp, _max_temp;
+        while (in_thermal_timestamps.read_row(_timestamp, _frame_index, _min_temp, _max_temp)) {
+            thermal_timestamps.emplace_back(_timestamp);
+            min_temp.emplace_back(_min_temp);
+            max_temp.emplace_back(_max_temp);
         }
 
         io::CSVReader<11> in_imu(std::string(SESSION_PATH) + std::string(IMU_PATH));
@@ -84,16 +92,16 @@ public:
 
         // Find IMU positions that corresponds to the actual camera frame timestamp
         do {
-            previousTimeDif = abs(timestamps[i] - imu_timestamps[imu_index]);
             imu_index += 1;
-        } while (abs(timestamps[i] - imu_timestamps[imu_index]) < previousTimeDif);
+            previousTimeDif = abs(timestamps[i] - imu_timestamps[imu_index]);
+        } while (abs(timestamps[i] - imu_timestamps[imu_index + 1]) < previousTimeDif);
 
         // Find GNSS positions that corresponds to the actual camera frame timestamp
         previousTimeDif = INT_MAX;
         do {
-            previousTimeDif = abs(timestamps[i] - gnss_timestamps[gnss_index]);
             gnss_index += 1;
-        } while (abs(timestamps[i] - gnss_timestamps[gnss_index]) < previousTimeDif);
+            previousTimeDif = abs(timestamps[i] - gnss_timestamps[gnss_index]);
+        } while (abs(timestamps[i] - gnss_timestamps[gnss_index + 1]) < previousTimeDif);
 
         dataset->year = int(year[gnss_index]);
         dataset->month = int(month[gnss_index]);
@@ -148,15 +156,27 @@ public:
     }
 
     bool readCameraFrame(BS::thread_pool &pool) {
-        if (dataset->frameIndex < totalFrames) {
-            Timer timer("Reading next video frame");
+        std::uint32_t &i = dataset->frameIndex;
+        std::uint32_t &t_i = dataset->thermalFrameIndex;
+
+        if (i < totalFrames) {
+            Timer timer("Camera frame extraction", dataset->cameraFrameExtraction);
 
             // Doesn't update the variable for some reason
+            //pool.push_task(&cv::VideoCapture::set, &thermalVideo, cv::CAP_PROP_POS_FRAMES, i * 3);
             //pool.push_task(&cv::VideoCapture::read, &leftVideo, dataset->leftCameraFrame);
             //pool.push_task(&cv::VideoCapture::read, &rightVideo, dataset->rightCameraFrame);
             //while (pool.get_tasks_running() > 0);
 
-            return leftVideo.read(dataset->leftCameraFrame) && rightVideo.read(dataset->rightCameraFrame);
+            // This is actually quicker than advancing to specific frame via CAP_PROP_POS_FRAMES
+            // It is done because the thermal camera has 3x the framerate of RGB camera
+            for (int k = 0; k < 3; k++) {
+                thermalVideo.read(dataset->thermalCameraFrame);
+            }
+
+            return leftVideo.read(dataset->leftCameraFrame) &&
+                   rightVideo.read(dataset->rightCameraFrame) &&
+                   thermalVideo.read(dataset->thermalCameraFrame);
         }
         return false;
     }
@@ -165,6 +185,7 @@ private:
     Dataset *dataset;
 
     std::vector<long> timestamps;
+    std::vector<long> thermal_timestamps;
     std::vector<long> imu_timestamps;
     std::vector<long> imu_gnss_timestamps;
     std::vector<long> gnss_timestamps;
@@ -172,6 +193,7 @@ private:
     std::vector<double> acc_x, acc_y, acc_z, ang_vel_x, ang_vel_y, ang_vel_z, quat_x, quat_y, quat_z, quat_w;
     std::vector<double> year, month, day, hours, minutes, seconds, nanoseconds;
     std::vector<double> latitude, longitude, altitude, azimuth;
+    std::vector<double> min_temp, max_temp;
 
     SunSet sunCalc = SunSet();
 
@@ -180,8 +202,9 @@ private:
     long previousTimeDif = INT_MAX;
 
     // Camera
-    cv::VideoCapture leftVideo{std::string(SESSION_PATH) + std::string(LEFT_VIDEO_PATH)};
-    cv::VideoCapture rightVideo{std::string(SESSION_PATH) + std::string(RIGHT_VIDEO_PATH)};
+    cv::VideoCapture leftVideo{SESSION_PATH + std::string(LEFT_VIDEO_PATH)};
+    cv::VideoCapture rightVideo{SESSION_PATH + std::string(RIGHT_VIDEO_PATH)};
+    cv::VideoCapture thermalVideo{SESSION_PATH + std::string(THERMAL_VIDEO_PATH)};
 
     double totalFrames = leftVideo.get(cv::CAP_PROP_FRAME_COUNT);
 };

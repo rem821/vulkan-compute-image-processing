@@ -8,7 +8,7 @@
 #include <fmt/core.h>
 
 void detectGlareAndOcclusion(const cv::Mat &cameraFrameGray, Dataset *dataset) {
-    Timer timer("Detecting glare");
+    Timer timer("Glare and occlusion detection", dataset->glareAndOcclusionDetection);
 
     // Step 1: Convert the frame to a color space that maximizes resolution in luminance
     // Step 2: Divide the camera frame into meaningful regions to detect glare in

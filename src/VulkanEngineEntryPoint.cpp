@@ -55,11 +55,10 @@ VulkanEngineEntryPoint::VulkanEngineEntryPoint(Dataset *_dataset) : dataset(_dat
 }
 
 void VulkanEngineEntryPoint::prepareInputImage() {
-    Timer timer("Generating texture from input image");
+    Timer timer("Texture generation", dataset->textureGeneration);
     cv::Mat rgba;
 
     cv::cvtColor(dataset->leftCameraFrame, rgba, cv::COLOR_BGR2RGBA);
-
 
     inputTexture.fromImageFile(rgba.data, rgba.cols * rgba.rows * rgba.channels(), VK_FORMAT_R8G8B8A8_UNORM,
                                rgba.cols, rgba.rows,
@@ -598,14 +597,14 @@ void VulkanEngineEntryPoint::prepareComputePipeline(std::vector<VkDescriptorSetL
 }
 
 void VulkanEngineEntryPoint::render() {
-    Timer timer("Rendering");
+    Timer timer("Rendering", dataset->rendering);
 
     CommandBufferPair bufferPair = renderer.beginFrame();
     if (bufferPair.computeCommandBuffer != nullptr && bufferPair.graphicsCommandBuffer != nullptr) {
         // Record compute command buffer
 
 #if DEBUG_GUI_ENABLED
-        bool shouldRender = debugGui.showWindow(window.sdlWindow(), dataset->frameIndex, *dataset);
+        debugGui.showWindow(window.sdlWindow(), dataset->frameIndex, dataset);
 #endif
 
         // First ComputeShader call -> Calculate DarkChannelPrior + maxAirLight channels for each workgroup
@@ -801,11 +800,11 @@ void VulkanEngineEntryPoint::render() {
 #endif
 
 #if DEBUG_GUI_ENABLED
-        if (shouldRender) debugGui.render(bufferPair.graphicsCommandBuffer);
+        debugGui.render(bufferPair.graphicsCommandBuffer);
 #endif
 
         renderer.endSwapChainRenderPass(bufferPair.graphicsCommandBuffer);
-        renderer.endFrame();
+        renderer.endFrame(dataset);
 
         vkQueueWaitIdle(engineDevice.graphicsQueue());
 
