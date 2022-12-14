@@ -71,7 +71,9 @@
 // Files
 #define LEFT_VIDEO_PATH "camera_left_front/video.mp4"
 #define RIGHT_VIDEO_PATH "camera_right_front/video.mp4"
-#define TIMESTAMPS_PATH "camera_left_front/timestamps.txt"
+#define THERMAL_VIDEO_PATH "camera_ir/video.mp4"
+#define THERMAL_TIMESTAMPS_PATH "camera_ir/timestamps.txt"
+#define CAMERA_TIMESTAMPS_PATH "camera_left_front/timestamps.txt"
 #define IMU_PATH "imu/imu.txt"
 #define TIME_PATH "gnss/time.txt"
 #define POSE_PATH "gnss/pose.txt"

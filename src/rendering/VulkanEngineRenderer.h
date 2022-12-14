@@ -11,6 +11,7 @@
 #include <vector>
 #include <stdexcept>
 #include <cassert>
+#include "../util/Dataset.h"
 
 struct CommandBufferPair {
     VkCommandBuffer graphicsCommandBuffer;
@@ -46,7 +47,7 @@ public:
     }
 
     CommandBufferPair beginFrame();
-    void endFrame();
+    void endFrame(Dataset *dataset);
     void beginSwapChainRenderPass(VkCommandBuffer commandBuffer, VkImage &outputImage);
     void endSwapChainRenderPass(VkCommandBuffer graphicsCommandBuffer);
 

@@ -16,8 +16,10 @@ struct Dataset {
 
     // Camera
     uint32_t frameIndex = 0;
+    uint32_t thermalFrameIndex = 0;
     cv::Mat leftCameraFrame{};
     cv::Mat rightCameraFrame{};
+    cv::Mat thermalCameraFrame{};
 
     // Inferred variables
     std::vector<double> heading;
@@ -47,4 +49,11 @@ struct Dataset {
     std::vector<cv::KeyPoint> rightKeypoints;
     cv::Mat rightDescriptors;
     bool geometryOk;
+
+
+    // Timers
+    float cameraFrameExtraction, glareAndOcclusionDetection, vanishingPointEstimation, vanishingPointVisibilityCalculation, fogDetection, allCPUAlgorithms, textureGeneration, frameSubmission, rendering;
+
+    // Configuration
+    bool showVanishingPoint = true, showKeypoints = true;
 };

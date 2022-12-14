@@ -6,6 +6,8 @@
 #include "DatasetFileReader.h"
 
 void estimateVanishingPointPosition(Dataset* dataset) {
+    Timer timer("Vanishing point estimation", &dataset->vanishingPointEstimation);
+
     // Estimate position of the road vanishing point
     int32_t r_vp_x = (dataset->cameraWidth / 2 + int32_t(HORIZONTAL_SENSITIVITY * dataset->headingDif.back()) +
                       HORIZONTAL_OFFSET);

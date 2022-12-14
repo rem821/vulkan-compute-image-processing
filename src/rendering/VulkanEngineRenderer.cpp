@@ -44,7 +44,7 @@ CommandBufferPair VulkanEngineRenderer::beginFrame() {
     return CommandBufferPair{graphicsCommandBuffer, computeCommandBuffer};
 }
 
-void VulkanEngineRenderer::endFrame() {
+void VulkanEngineRenderer::endFrame(Dataset *dataset) {
     assert(isFrameStarted && "Can't call endFrame while frame is not in progress!");
     auto commandBuffer = getCurrentGraphicsCommandBuffer();
 
@@ -52,7 +52,7 @@ void VulkanEngineRenderer::endFrame() {
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 
     {
-        Timer timer("Frame submitting");
+        Timer timer("Frame submission", &dataset->frameSubmission);
 
         auto result = engineSwapChain->submitCommandBuffers(&commandBuffer, &computeCommandBuffer, &currentImageIndex);
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || window.wasWindowResized()) {

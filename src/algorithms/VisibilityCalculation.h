@@ -19,7 +19,7 @@ public:
 
     static void
     calculateVisibilityVp(const cv::Mat &cameraFrameGray, Dataset *dataset, std::pair<int, int> centerPoint) {
-        Timer timer("Calculating vanishing point visibility");
+        Timer timer("Vanishing point visibility calculation", &dataset->vanishingPointVisibilityCalculation);
         _calculateVisibility(cameraFrameGray, dataset, true, centerPoint, std::pair(-1, -1));
     }
 
@@ -119,7 +119,6 @@ private:
                                  min(MAX_VISIBILITY_THRESHOLD, max(MIN_VISIBILITY_THRESHOLD, coeffs[0]))) /
                                 (MAX_VISIBILITY_THRESHOLD - MIN_VISIBILITY_THRESHOLD));
             dataset->visibility.at<float>(position.first, position.second) = float(vis);
-
         }
     }
 };
