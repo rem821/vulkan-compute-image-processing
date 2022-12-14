@@ -1,7 +1,6 @@
 #version 450
 
-#define SHI_TOMASI_MAX_CORNERS 150
-#define KEYPOINT_SIZE 3
+#define MAX_KEYPOINTS 200
 
 layout (binding = 1) uniform sampler2D samplerColor;
 
@@ -9,8 +8,10 @@ layout (binding = 2) uniform UBO
 {
     int showVanishingPoint;
     int showKeyPoints;
+    int numberOfKeypoints;
+    int keypointSize;
     vec3 vanishingPoint;
-    vec2 keyPoints[SHI_TOMASI_MAX_CORNERS];
+    vec2 keyPoints[MAX_KEYPOINTS];
 } ubo;
 
 layout (location = 0) in vec2 inUV;
@@ -21,9 +22,9 @@ void main()
 {
     if (bool(ubo.showKeyPoints)) {
         // Visualise SHI-TOMASI corners
-        for (int i = 0; i < SHI_TOMASI_MAX_CORNERS; i += 2) {
-            if (gl_FragCoord.x > ubo.keyPoints[i].x - KEYPOINT_SIZE && gl_FragCoord.x < ubo.keyPoints[i].x + KEYPOINT_SIZE) {
-                if (gl_FragCoord.y > ubo.keyPoints[i].y - KEYPOINT_SIZE && gl_FragCoord.y < ubo.keyPoints[i].y + KEYPOINT_SIZE) {
+        for (int i = 0; i < ubo.numberOfKeypoints; i += 2) {
+            if (gl_FragCoord.x > ubo.keyPoints[i].x - ubo.keypointSize && gl_FragCoord.x < ubo.keyPoints[i].x + ubo.keypointSize) {
+                if (gl_FragCoord.y > ubo.keyPoints[i].y - ubo.keypointSize && gl_FragCoord.y < ubo.keyPoints[i].y + ubo.keypointSize) {
                     outFragColor = texture(samplerColor, inUV) + vec4(1.0, 1.0, 0.0, 1.0);
                     return;
                 }

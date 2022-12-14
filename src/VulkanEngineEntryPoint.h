@@ -38,8 +38,10 @@ public:
     struct {
         alignas(4) glm::int32_t showVanishingPoint;
         alignas(4) glm::int32_t showKeypoints;
+        alignas(4) glm::int32_t numberOfKeypoints;
+        alignas(4) glm::int32_t keypointSize;
         alignas(16) glm::vec3 vanishingPoint;
-        alignas(8) glm::vec2 keyPoints[SHI_TOMASI_MAX_CORNERS];
+        alignas(8) glm::vec2 keyPoints[MAX_KEYPOINTS];
     } uboFragmentShader{};
 
     struct {

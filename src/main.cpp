@@ -19,7 +19,7 @@ RENDERDOC_API_1_1_2 *rdoc_api = nullptr;
 
 void runCameraAlgorithms(Dataset *dataset, BS::thread_pool &pool) {
     if (dataset != nullptr && dataset->frameIndex != 0) {
-        Timer timer("All CPU algorithms", dataset->allCPUAlgorithms);
+        Timer tim("All CPU algorithms", &dataset->allCPUAlgorithms);
 
         cv::Mat leftCameraFrameGray;
         cv::Mat rightCameraFrameGray;
@@ -34,7 +34,7 @@ void runCameraAlgorithms(Dataset *dataset, BS::thread_pool &pool) {
         pool.push_task(detectGlareAndOcclusion, leftCameraFrameGray, dataset);
 
         {
-            Timer t("Fog detection", dataset->fogDetection);
+            Timer t("Fog detection", &dataset->fogDetection);
             for (int j = 0; j < DFT_BLOCK_COUNT; j++) {
                 for (int i = 0; i < DFT_BLOCK_COUNT; i++) {
                     int w = (DFT_WINDOW_SIZE / 2) +
@@ -51,8 +51,8 @@ void runCameraAlgorithms(Dataset *dataset, BS::thread_pool &pool) {
         }
 
         {
-            //Timer timer("Assert camera geometry");
-            //assertCameraGeometry(dataset, leftCameraFrameGray, rightCameraFrameGray, pool);
+            Timer timer("Assert camera geometry");
+            assertCameraGeometry(dataset, leftCameraFrameGray, rightCameraFrameGray, pool);
         }
 
         VisibilityCalculation::calculateVisibilityScore(dataset);

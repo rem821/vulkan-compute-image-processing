@@ -8,7 +8,7 @@
 //  1 --> Work PC (AMD Radeon card)
 //  2 --> Macbook Pro  16" 2019 (AMD Radeon card)
 
-#define DEVICE_TYPE 1
+#define DEVICE_TYPE 0
 
 #if DEVICE_TYPE == 0
 
@@ -103,12 +103,8 @@
 // DFT BLOCK ANALYSIS
 #define DFT_BLOCK_COUNT 8
 
-// SHI-TOMASI
-#define SHI_TOMASI_MAX_CORNERS 150 // Don't forget to mirror this setting into texture.frag shader
-#define SHI_TOMASI_QUALITY_LEVEL 0.1
-#define SHI_TOMASI_MIN_DISTANCE 1
-#define SHI_TOMASI_BLOCK_SIZE 3
-#define SHI_TOMASI_GRADIENT_SIZE 3
+// Keypoint detection
+#define MAX_KEYPOINTS 200 // Don't forget to mirror this setting into texture.frag shader
 
 // Debugging section
 #define TIMER_ON true

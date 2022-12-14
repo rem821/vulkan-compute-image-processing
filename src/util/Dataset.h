@@ -52,5 +52,8 @@ struct Dataset {
 
 
     // Timers
-    double cameraFrameExtraction, glareAndOcclusionDetection, vanishingPointEstimation, vanishingPointVisibilityCalculation, fogDetection, allCPUAlgorithms, textureGeneration, frameSubmission, rendering;
+    float cameraFrameExtraction, glareAndOcclusionDetection, vanishingPointEstimation, vanishingPointVisibilityCalculation, fogDetection, allCPUAlgorithms, textureGeneration, frameSubmission, rendering;
+
+    // Configuration
+    bool showVanishingPoint = true, showKeypoints = true;
 };

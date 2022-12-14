@@ -13,7 +13,7 @@ void detectKeypoints(const cv::Mat &frame, Dataset *dataset, bool isLeft) {
     auto rightROI = cv::Rect(0, 0, dataset->cameraWidth / 2, dataset->cameraHeight);
     auto imageROI = cv::Mat(frame, isLeft ? leftROI : rightROI);
 
-    auto detector = cv::ORB::create(SHI_TOMASI_MAX_CORNERS);
+    auto detector = cv::ORB::create(MAX_KEYPOINTS);
     detector->detectAndCompute(imageROI, cv::Mat(), isLeft ? dataset->leftKeypoints : dataset->rightKeypoints,
                                isLeft ? dataset->leftDescriptors : dataset->rightDescriptors);
 

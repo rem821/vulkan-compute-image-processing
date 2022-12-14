@@ -19,7 +19,7 @@ public:
 
     static void
     calculateVisibilityVp(const cv::Mat &cameraFrameGray, Dataset *dataset, std::pair<int, int> centerPoint) {
-        Timer timer("Vanishing point visibility calculation", dataset->vanishingPointVisibilityCalculation);
+        Timer timer("Vanishing point visibility calculation", &dataset->vanishingPointVisibilityCalculation);
         _calculateVisibility(cameraFrameGray, dataset, true, centerPoint, std::pair(-1, -1));
     }
 

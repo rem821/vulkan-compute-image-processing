@@ -160,7 +160,7 @@ public:
         std::uint32_t &t_i = dataset->thermalFrameIndex;
 
         if (i < totalFrames) {
-            Timer timer("Camera frame extraction", dataset->cameraFrameExtraction);
+            Timer timer("Camera frame extraction", &dataset->cameraFrameExtraction);
 
             // Doesn't update the variable for some reason
             //pool.push_task(&cv::VideoCapture::set, &thermalVideo, cv::CAP_PROP_POS_FRAMES, i * 3);

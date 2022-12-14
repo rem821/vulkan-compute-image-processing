@@ -52,7 +52,7 @@ void VulkanEngineRenderer::endFrame(Dataset *dataset) {
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 
     {
-        Timer timer("Frame submission", dataset->frameSubmission);
+        Timer timer("Frame submission", &dataset->frameSubmission);
 
         auto result = engineSwapChain->submitCommandBuffers(&commandBuffer, &computeCommandBuffer, &currentImageIndex);
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || window.wasWindowResized()) {

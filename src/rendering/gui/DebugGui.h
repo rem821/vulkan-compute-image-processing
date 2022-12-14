@@ -28,17 +28,18 @@ public:
 
     DebugGui &operator=(const DebugGui &) = delete;
 
-    void showWindow(SDL_Window *window, long frameIndex, const Dataset *dataset);
+    void showWindow(SDL_Window *window, long frameIndex, Dataset *dataset);
 
     void render(VkCommandBuffer &commandBuffer);
 
     void processEvent(SDL_Event event);
 
 private:
-    void showGraphs(long frameIndex, const Dataset *dataset);
-    void showStats(long frameIndex, const Dataset *dataset);
+    void showGraphs(long frameIndex, Dataset *dataset);
+    void showStats(long frameIndex, Dataset *dataset);
+    void showTiming(long frameIndex, Dataset *dataset);
 
-    bool hasSomethingToRender = false;
+    ImGuiWindowFlags window_flags = 0;
 
     double lastFrameTimestamp = 0;
     double movingFPSAverage = 0;

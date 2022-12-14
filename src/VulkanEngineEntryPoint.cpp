@@ -55,7 +55,7 @@ VulkanEngineEntryPoint::VulkanEngineEntryPoint(Dataset *_dataset) : dataset(_dat
 }
 
 void VulkanEngineEntryPoint::prepareInputImage() {
-    Timer timer("Texture generation", dataset->textureGeneration);
+    Timer timer("Texture generation", &dataset->textureGeneration);
     cv::Mat rgba;
 
     cv::cvtColor(dataset->leftCameraFrame, rgba, cv::COLOR_BGR2RGBA);
@@ -161,8 +161,10 @@ void VulkanEngineEntryPoint::updateGraphicsUniformBuffers() {
     memcpy(uniformBufferVertexShader->getMappedMemory(), &uboVertexShader, sizeof(uboVertexShader));
 
     if (dataset != nullptr) {
-        uboFragmentShader.showVanishingPoint = false;
-        uboFragmentShader.showKeypoints = true;
+        uboFragmentShader.showVanishingPoint = dataset->showVanishingPoint;
+        uboFragmentShader.showKeypoints = dataset->showKeypoints;
+        uboFragmentShader.numberOfKeypoints = MAX_KEYPOINTS;
+        uboFragmentShader.keypointSize = 3;
         uboFragmentShader.vanishingPoint = glm::vec3(dataset->vanishingPoint.first, dataset->vanishingPoint.second,
                                                      DFT_WINDOW_SIZE);
         int i = 0;
@@ -597,7 +599,7 @@ void VulkanEngineEntryPoint::prepareComputePipeline(std::vector<VkDescriptorSetL
 }
 
 void VulkanEngineEntryPoint::render() {
-    Timer timer("Rendering", dataset->rendering);
+    Timer timer("Rendering", &dataset->rendering);
 
     CommandBufferPair bufferPair = renderer.beginFrame();
     if (bufferPair.computeCommandBuffer != nullptr && bufferPair.graphicsCommandBuffer != nullptr) {

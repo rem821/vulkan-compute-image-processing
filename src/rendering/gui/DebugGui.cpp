@@ -54,7 +54,7 @@ DebugGui::~DebugGui() {
     ImGui_ImplVulkan_Shutdown();
 }
 
-void DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset *dataset) {
+void DebugGui::showWindow(SDL_Window *window, long frameIndex, Dataset *dataset) {
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplSDL2_NewFrame(window);
 
@@ -67,50 +67,20 @@ void DebugGui::showWindow(SDL_Window *window, long frameIndex, const Dataset *da
 
     showGraphs(frameIndex, dataset);
     showStats(frameIndex, dataset);
+    showTiming(frameIndex, dataset);
 
     ImGui::Render();
 }
 
-void DebugGui::showGraphs(long frameIndex, const Dataset *dataset) {
-    ImGuiWindowFlags window_flags = 0;
-    window_flags |= ImGuiWindowFlags_MenuBar;
-    window_flags |= ImGuiWindowFlags_NoBackground;
-    window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus;
-
-    if (!ImGui::Begin("Runtime info", nullptr, window_flags)) {
-        // Early out if the window is collapsed, as an optimization.
+void DebugGui::showGraphs(long frameIndex, Dataset *dataset) {
+    if (!ImGui::Begin("Data processing", nullptr, window_flags)) {
         ImGui::End();
+        return;
     }
 
-    // Frame index
-    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Frame: %ld", frameIndex);
+    ImGui::Checkbox("Show vanishing point", &dataset->showVanishingPoint);
+    ImGui::Checkbox("Show keypoints", &dataset->showKeypoints);
 
-    // Running time, Frame time and FPS (Moving Average)
-
-    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Running time: %f s", ImGui::GetTime());
-    double frameTime = (ImGui::GetTime() - lastFrameTimestamp) * 1000;
-    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Frame time: %f ms", frameTime);
-    movingFPSAverage = (0.08f * (1000.0f / frameTime)) + (1.0f - 0.08f) * movingFPSAverage;
-    ImGui::TextColored(ImVec4(1, 0, 0, 1), "FPS: %f", movingFPSAverage);
-    lastFrameTimestamp = ImGui::GetTime();
-
-    ImGui::Text(" ");
-
-    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Time: %02d.%02d.%d %02d:%02d:%02d", dataset->day, dataset->month,
-                       dataset->year,
-                       dataset->hours, dataset->minutes, dataset->seconds);
-
-    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Position: LAT:%f, LONG:%f, ALT:%f", dataset->latitude, dataset->longitude,
-                       dataset->altitude);
-    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Azimuth: %f", dataset->azimuth);
-    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Sunrise: %dh %02dmin", int(dataset->sunrise),
-                       int((dataset->sunrise - int(dataset->sunrise)) * 60.0));
-    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Sunset: %dh %02dmin", int(dataset->sunset),
-                       int((dataset->sunset - int(dataset->sunset)) * 60.0));
-
-    ImGui::Text(" ");
-
-    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Fogged: %d", int(dataset->visibilityScore));
     std::vector<double> x(frameIndex);
     std::iota(std::begin(x), std::end(x), 0);
     if (ImPlot::BeginPlot("##Visibility (FFT)")) {
@@ -162,20 +132,84 @@ void DebugGui::showGraphs(long frameIndex, const Dataset *dataset) {
     }
 
     ImGui::End();
-    hasSomethingToRender = true;
 }
 
-void DebugGui::showStats(long frameIndex, const Dataset *dataset) {
+void DebugGui::showStats(long frameIndex, Dataset *dataset) {
+    if (!ImGui::Begin("Timing", nullptr, window_flags)) {
+        ImGui::End();
+        return;
+    }
 
+    // Frame index
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Frame: %ld", frameIndex);
+
+    // Running time, Frame time and FPS (Moving Average)
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Running time: %f s", ImGui::GetTime());
+    double frameTime = (ImGui::GetTime() - lastFrameTimestamp) * 1000;
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Frame time: %f ms", frameTime);
+    movingFPSAverage = (0.08f * (1000.0f / frameTime)) + (1.0f - 0.08f) * movingFPSAverage;
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "FPS: %f", movingFPSAverage);
+    lastFrameTimestamp = ImGui::GetTime();
+
+    static const char *labelIds[] = {"CameraFrameExtraction", "GlareAndOcclusion Detection", "VanishingPointEstimation",
+                                     "VanishingPointVisibilityCalculation", "FogDetection",
+                                     "TextureGeneration", "FrameSubmission", "Rendering"};
+    float values[] = {dataset->cameraFrameExtraction, dataset->glareAndOcclusionDetection,
+                      dataset->vanishingPointEstimation, dataset->vanishingPointVisibilityCalculation,
+                      dataset->fogDetection, dataset->textureGeneration,
+                      dataset->frameSubmission, dataset->rendering};
+    float sum = 0.0f;
+    for (const auto &val: values) {
+        sum += val;
+    }
+    if (sum != 0.0f && sum != 1.0f) {
+        for (auto &val: values) {
+            val /= sum;
+        }
+        sum = 0.0f;
+        for (const auto &val: values) {
+            sum += val;
+        }
+    }
+
+    if (ImPlot::BeginPlot("##Timing")) {
+        static int axesFlags = ImPlotAxisFlags_Lock | ImPlotAxisFlags_NoGridLines | ImPlotAxisFlags_NoTickMarks |
+                               ImPlotAxisFlags_NoLabel | ImPlotAxisFlags_NoTickLabels;
+        ImPlot::SetupAxes(nullptr, nullptr, axesFlags, axesFlags);
+        ImPlot::PlotPieChart(labelIds, values, 8, 0.5, 0.5, 0.4, "%.2f", 90, 0);
+        ImPlot::EndPlot();
+    }
+
+    ImGui::End();
+}
+
+void DebugGui::showTiming(long frameIndex, Dataset *dataset) {
+    if (!ImGui::Begin("ADAS flags", nullptr, window_flags)) {
+        ImGui::End();
+        return;
+    }
+
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Time: %02d.%02d.%d %02d:%02d:%02d", dataset->day, dataset->month,
+                       dataset->year,
+                       dataset->hours, dataset->minutes, dataset->seconds);
+
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Position: LAT:%f, LONG:%f, ALT:%f", dataset->latitude, dataset->longitude,
+                       dataset->altitude);
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Azimuth: %f", dataset->azimuth);
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Sunrise: %dh %02dmin", int(dataset->sunrise),
+                       int((dataset->sunrise - int(dataset->sunrise)) * 60.0));
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Sunset: %dh %02dmin", int(dataset->sunset),
+                       int((dataset->sunset - int(dataset->sunset)) * 60.0));
+
+    ImGui::Text(" ");
+
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Fogged: %d", int(dataset->visibilityScore));
+
+    ImGui::End();
 }
 
 void DebugGui::render(VkCommandBuffer &commandBuffer) {
-    if(hasSomethingToRender) {
-        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
-    } else {
-        ImGui::EndFrame();
-    }
-    hasSomethingToRender = false;
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
 }
 
 void DebugGui::processEvent(SDL_Event event) {
