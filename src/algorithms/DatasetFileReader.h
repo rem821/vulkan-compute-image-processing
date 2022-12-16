@@ -5,6 +5,8 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <pcl/io/pcd_io.h>
+#include <pcl/point_types.h>
 #include "../GlobalConfiguration.h"
 #include "../../external/fastcsv/csv.h"
 #include "../../external/sunset/sunset.h"
@@ -13,19 +15,20 @@
 #include "../util/circularbuffer.h"
 #include "../util/Dataset.h"
 #include "../profiling/Timer.h"
-
 #include "../threading/BS_thread_pool.h"
 
 class DatasetFileReader {
 public:
     DatasetFileReader(Dataset *_dataset, BS::thread_pool &pool) : dataset(_dataset) {
+        // Camera timestamps - all is referenced to those
         io::CSVReader<3> in_camera_timestamps(std::string(SESSION_PATH) + std::string(CAMERA_TIMESTAMPS_PATH));
         long _timestamp, _frame_index, _camera_timestamp;
         while (in_camera_timestamps.read_row(_timestamp, _frame_index, _camera_timestamp)) {
             timestamps.emplace_back(_timestamp);
         }
 
-        io::CSVReader<4> in_thermal_timestamps(std::string(SESSION_PATH) + std::string(THERMAL_TIMESTAMPS_PATH));
+        // Thermal camera readings
+        io::CSVReader<4> in_thermal_timestamps(std::string(SESSION_PATH) + THERMAL_TIMESTAMPS_PATH);
         double _min_temp, _max_temp;
         while (in_thermal_timestamps.read_row(_timestamp, _frame_index, _min_temp, _max_temp)) {
             thermal_timestamps.emplace_back(_timestamp);
@@ -33,8 +36,29 @@ public:
             max_temp.emplace_back(_max_temp);
         }
 
+        // Left LiDAR
+        io::CSVReader<3> in_left_lidar_timestamps(std::string(SESSION_PATH) + LIDAR_LEFT_PATH + "timestamps.txt");
+        long _lidar_points;
+        while (in_left_lidar_timestamps.read_row(_timestamp, _frame_index, _lidar_points)) {
+            left_lidar_timestamps.emplace_back(_timestamp);
+            left_lidar_points.emplace_back(_lidar_points);
+        }
 
-        io::CSVReader<11> in_imu(std::string(SESSION_PATH) + std::string(IMU_PATH));
+        // Center LiDAR
+        io::CSVReader<2> in_center_lidar_timestamps(std::string(SESSION_PATH) + LIDAR_CENTER_PATH + "timestamps.txt");
+        while (in_center_lidar_timestamps.read_row(_timestamp, _frame_index)) {
+            center_lidar_timestamps.emplace_back(_timestamp);
+        }
+
+        // Right LiDAR
+        io::CSVReader<3> in_right_lidar_timestamps(std::string(SESSION_PATH) + LIDAR_RIGHT_PATH + "timestamps.txt");
+        while (in_right_lidar_timestamps.read_row(_timestamp, _frame_index, _lidar_points)) {
+            right_lidar_timestamps.emplace_back(_timestamp);
+            right_lidar_points.emplace_back(_lidar_points);
+        }
+
+        // IMU readings
+        io::CSVReader<11> in_imu(std::string(SESSION_PATH) + IMU_PATH);
         float _acc_x, _acc_y, _acc_z, _ang_vel_x, _ang_vel_y, _ang_vel_z, _quat_x, _quat_y, _quat_z, _quat_w;
         while (in_imu.read_row(_timestamp, _acc_x, _acc_y, _acc_z, _ang_vel_x, _ang_vel_y, _ang_vel_z, _quat_x, _quat_y,
                                _quat_z, _quat_w)) {
@@ -54,7 +78,8 @@ public:
             quat_w.emplace_back(_quat_w);
         }
 
-        io::CSVReader<8> in_time(std::string(SESSION_PATH) + std::string(TIME_PATH));
+        // GNSS time readings
+        io::CSVReader<8> in_time(std::string(SESSION_PATH) + TIME_PATH);
         float _year, _month, _day, _hours, _minutes, _seconds, _nanoseconds;
         while (in_time.read_row(_timestamp, _year, _month, _day, _hours, _minutes, _seconds, _nanoseconds)) {
             imu_gnss_timestamps.emplace_back(_timestamp);
@@ -69,7 +94,8 @@ public:
             nanoseconds.emplace_back(_nanoseconds);
         }
 
-        io::CSVReader<5> in_pose(std::string(SESSION_PATH) + std::string(POSE_PATH));
+        // GNSS pose readings
+        io::CSVReader<5> in_pose(std::string(SESSION_PATH) + POSE_PATH);
         float _latitude, _longitude, _altitude, _azimuth;
         while (in_pose.read_row(_timestamp, _latitude, _longitude, _altitude, _azimuth)) {
             gnss_timestamps.emplace_back(_timestamp);
@@ -88,17 +114,50 @@ public:
     }
 
     bool readData(BS::thread_pool &pool) {
+        Timer timer("Data frame extraction", &dataset->dataFrameExtraction);
         long i = dataset->frameIndex;
         bool isOk;
 
-        // Find IMU positions that corresponds to the actual camera frame timestamp
+        char file_i[6];
+        // Find left LiDAR frame that corresponds to the actual camera frame timestamp
+        previousTimeDif = LONG_MAX;
+        do {
+            left_lidar_index += 1;
+            previousTimeDif = abs(timestamps[i] - left_lidar_timestamps[left_lidar_index]);
+        } while (abs(timestamps[i] - left_lidar_timestamps[left_lidar_index + 1]) < previousTimeDif);
+//        snprintf(file_i, 6, "%06d", left_lidar_index);
+//        if (pcl::io::loadPCDFile<pcl::PointXYZ>(std::string(SESSION_PATH) + LIDAR_LEFT_PATH + file_i,
+//                                                dataset->leftLidarCloud) == -1) { throw std::exception(); }
+
+        // Find center LiDAR frame that corresponds to the actual camera frame timestamp
+        previousTimeDif = LONG_MAX;
+        do {
+            center_lidar_index += 1;
+            previousTimeDif = abs(timestamps[i] - center_lidar_timestamps[center_lidar_index]);
+        } while (abs(timestamps[i] - center_lidar_timestamps[center_lidar_index + 1]) < previousTimeDif);
+//        snprintf(file_i, 6, "%06d", center_lidar_index);
+//        if (pcl::io::loadPCDFile<pcl::PointXYZ>(std::string(SESSION_PATH) + LIDAR_CENTER_PATH + file_i,
+//                                                dataset->centerLidarCloud) == -1) { throw std::exception(); }
+
+        // Find right LiDAR frame that corresponds to the actual camera frame timestamp
+        previousTimeDif = LONG_MAX;
+        do {
+            right_lidar_index += 1;
+            previousTimeDif = abs(timestamps[i] - right_lidar_timestamps[right_lidar_index]);
+        } while (abs(timestamps[i] - right_lidar_timestamps[right_lidar_index + 1]) < previousTimeDif);
+//        snprintf(file_i, 6, "%06d", right_lidar_index);
+//        if (pcl::io::loadPCDFile<pcl::PointXYZ>(std::string(SESSION_PATH) + LIDAR_RIGHT_PATH + file_i,
+//                                                dataset->rightLidarCloud) == -1) { throw std::exception(); }
+
+        // Find IMU frame that corresponds to the actual camera frame timestamp
+        previousTimeDif = LONG_MAX;
         do {
             imu_index += 1;
             previousTimeDif = abs(timestamps[i] - imu_timestamps[imu_index]);
         } while (abs(timestamps[i] - imu_timestamps[imu_index + 1]) < previousTimeDif);
 
-        // Find GNSS positions that corresponds to the actual camera frame timestamp
-        previousTimeDif = INT_MAX;
+        // Find GNSS frame that corresponds to the actual camera frame timestamp
+        previousTimeDif = LONG_MAX;
         do {
             gnss_index += 1;
             previousTimeDif = abs(timestamps[i] - gnss_timestamps[gnss_index]);
@@ -157,10 +216,7 @@ public:
     }
 
     bool readCameraFrame(BS::thread_pool &pool) {
-        std::uint32_t &i = dataset->frameIndex;
-        std::uint32_t &t_i = dataset->thermalFrameIndex;
-
-        if (i < totalFrames) {
+        if (dataset->frameIndex < totalFrames) {
             Timer timer("Camera frame extraction", &dataset->cameraFrameExtraction);
 
             // Doesn't update the variable for some reason
@@ -187,6 +243,12 @@ private:
 
     std::vector<long> timestamps;
     std::vector<long> thermal_timestamps;
+    std::vector<long> left_lidar_timestamps;
+    std::vector<long> left_lidar_points;
+    std::vector<long> center_lidar_timestamps;
+    std::vector<long> right_lidar_timestamps;
+    std::vector<long> right_lidar_points;
+
     std::vector<long> imu_timestamps;
     std::vector<long> imu_gnss_timestamps;
     std::vector<long> gnss_timestamps;
@@ -198,9 +260,12 @@ private:
 
     SunSet sunCalc = SunSet();
 
-    long imu_index = 0;
-    long gnss_index = 0;
-    long previousTimeDif = INT_MAX;
+    int32_t left_lidar_index = 0;
+    int32_t center_lidar_index = 0;
+    int32_t right_lidar_index = 0;
+    int32_t imu_index = 0;
+    int32_t gnss_index = 0;
+    long previousTimeDif = LONG_MAX;
 
     // Camera
     cv::VideoCapture leftVideo{SESSION_PATH + std::string(LEFT_VIDEO_PATH)};

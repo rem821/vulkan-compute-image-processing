@@ -6,6 +6,8 @@
 #include "../GlobalConfiguration.h"
 #include "opencv4/opencv2/opencv.hpp"
 #include "../util/circularbuffer.h"
+#include <pcl/io/pcd_io.h>
+#include <pcl/point_types.h>
 
 struct Dataset {
     // Original variables
@@ -20,6 +22,19 @@ struct Dataset {
     cv::Mat leftCameraFrame{};
     cv::Mat rightCameraFrame{};
     cv::Mat thermalCameraFrame{};
+
+    // LiDARs
+    uint32_t leftLidarIndex = 0;
+    uint32_t leftLidarPoints = 0;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr leftLidarCloud{};
+
+    uint32_t centerLidarIndex = 0;
+    uint32_t centerLidarPoints = 0;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr centerLidarCloud{};
+
+    uint32_t rightLidarIndex = 0;
+    uint32_t rightLidarPoints = 0;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr rightLidarCloud{};
 
     // Inferred variables
     std::vector<double> heading;
@@ -52,7 +67,7 @@ struct Dataset {
 
 
     // Timers
-    float cameraFrameExtraction, glareAndOcclusionDetection, vanishingPointEstimation, vanishingPointVisibilityCalculation, fogDetection, allCPUAlgorithms, textureGeneration, frameSubmission, rendering;
+    float dataFrameExtraction, cameraFrameExtraction, glareAndOcclusionDetection, vanishingPointEstimation, vanishingPointVisibilityCalculation, fogDetection, allCPUAlgorithms, textureGeneration, frameSubmission, rendering;
 
     // Configuration
     bool showVanishingPoint = true, showKeypoints = true;

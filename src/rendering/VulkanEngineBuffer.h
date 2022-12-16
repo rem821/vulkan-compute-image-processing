@@ -61,9 +61,9 @@ private:
     VkBuffer buffer = VK_NULL_HANDLE;
     VkDeviceMemory memory = VK_NULL_HANDLE;
 
+    VkDeviceSize instanceSize;
     VkDeviceSize bufferSize;
     uint32_t instanceCount;
-    VkDeviceSize instanceSize;
     VkDeviceSize alignmentSize;
     VkBufferUsageFlags usageFlags;
     VkMemoryPropertyFlags memoryPropertyFlags;

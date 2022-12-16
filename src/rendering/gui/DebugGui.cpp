@@ -134,7 +134,7 @@ void DebugGui::showGraphs(long frameIndex, Dataset *dataset) {
     ImGui::End();
 }
 
-void DebugGui::showStats(long frameIndex, Dataset *dataset) {
+void DebugGui::showTiming(long frameIndex, Dataset *dataset) {
     if (!ImGui::Begin("Timing", nullptr, window_flags)) {
         ImGui::End();
         return;
@@ -151,10 +151,10 @@ void DebugGui::showStats(long frameIndex, Dataset *dataset) {
     ImGui::TextColored(ImVec4(1, 0, 0, 1), "FPS: %f", movingFPSAverage);
     lastFrameTimestamp = ImGui::GetTime();
 
-    static const char *labelIds[] = {"CameraFrameExtraction", "GlareAndOcclusion Detection", "VanishingPointEstimation",
+    static const char *labelIds[] = {"DataFrameExtraction", "GlareAndOcclusion Detection", "VanishingPointEstimation",
                                      "VanishingPointVisibilityCalculation", "FogDetection",
                                      "TextureGeneration", "FrameSubmission", "Rendering"};
-    float values[] = {dataset->cameraFrameExtraction, dataset->glareAndOcclusionDetection,
+    float values[] = {dataset->dataFrameExtraction, dataset->glareAndOcclusionDetection,
                       dataset->vanishingPointEstimation, dataset->vanishingPointVisibilityCalculation,
                       dataset->fogDetection, dataset->textureGeneration,
                       dataset->frameSubmission, dataset->rendering};
@@ -183,7 +183,7 @@ void DebugGui::showStats(long frameIndex, Dataset *dataset) {
     ImGui::End();
 }
 
-void DebugGui::showTiming(long frameIndex, Dataset *dataset) {
+void DebugGui::showStats(long frameIndex, Dataset *dataset) {
     if (!ImGui::Begin("ADAS flags", nullptr, window_flags)) {
         ImGui::End();
         return;

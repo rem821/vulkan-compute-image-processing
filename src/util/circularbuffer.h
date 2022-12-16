@@ -156,10 +156,10 @@ private:
 
     mutable std::mutex _mtx;
     std::unique_ptr<value_type[]> _buff;
+    size_type _max_size = 0;
+    size_type _size = 0;
     size_type _head = 0;
     size_type _tail = 0;
-    size_type _size = 0;
-    size_type _max_size = 0;
 
     template<bool isConst = false>
     struct BufferIterator {

@@ -59,7 +59,7 @@ public:
 
     VkPhysicalDevice getPhysicalDevice() { return physicalDevice; }
 
-    const VkDevice getDevice() { return device_; }
+    [[nodiscard]] VkDevice getDevice() const { return device_; }
 
     VkSurfaceKHR surface() { return surface_; }
 

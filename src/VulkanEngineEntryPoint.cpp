@@ -1,13 +1,8 @@
 //
 // Created by Stanislav Svědiroh on 27.09.2022.
 //
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-
 #include "VulkanEngineEntryPoint.h"
 #include "profiling/Timer.h"
-#include "../external/stb/stb_image.h"
-#include "../external/stb/stb_image_write.h"
 #include <vulkan/vulkan.hpp>
 #include <fmt/core.h>
 #include <vector>
@@ -1243,7 +1238,6 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
     VkImage srcImage = renderer.getEngineSwapChain()->getImage(0);
     uint32_t width = renderer.getEngineSwapChain()->getSwapChainExtent().width;
     uint32_t height = renderer.getEngineSwapChain()->getSwapChainExtent().height;
-    uint32_t channels = 4;
 
     // Create the linear tiled destination image to copy to and to read the memory from
     VkImageCreateInfo imageCreateCI{};
@@ -1386,7 +1380,8 @@ void VulkanEngineEntryPoint::saveScreenshot(const char *filename) {
 
     stbi_write_png(filename, int(width), int(height), int(channels), dataRgb, 0);
 #else
-    stbi_write_png(filename, int(width), int(height), int(channels), data, 0);
+    //TODO: Migrate to opencv
+    //stbi_write_png(filename, int(width), int(height), int(channels), data, 0);
 #endif
     fmt::print("Screenshot saved to disk\n");
 
@@ -1469,6 +1464,8 @@ void VulkanEngineEntryPoint::handleEvents() {
                     zoom += 30;
                 } else if (event.wheel.y < 0) {
                     zoom -= 30;
+                } else {
+
                 }
             }
             case SDL_MOUSEBUTTONDOWN: {

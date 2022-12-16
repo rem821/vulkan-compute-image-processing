@@ -21,10 +21,10 @@ struct Timer {
 
 
     std::string _name;
-    float *_timerValue;
+    float *_timerValue = nullptr;
 
-    Timer(std::string name, float *timerValue = nullptr) : _name(std::move(name)), _timerValue(timerValue),
-                                                           _start(std::chrono::high_resolution_clock::now()) {}
+    explicit Timer(std::string name, float *timerValue = nullptr) : _start(std::chrono::high_resolution_clock::now()),
+                                                           _name(std::move(name)), _timerValue(timerValue) {}
 
     ~Timer() {
 #if TIMER_ON
@@ -32,7 +32,7 @@ struct Timer {
         _duration = _end - _start;
 
         float ms = _duration.count() * 1000;
-        if(_timerValue != nullptr) *_timerValue = ms;
+        if (_timerValue != nullptr) *_timerValue = ms;
         fmt::print("Execution of {} took {} ms\n", _name, ms);
 #endif
     }

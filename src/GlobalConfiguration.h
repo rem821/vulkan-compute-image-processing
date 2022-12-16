@@ -8,7 +8,7 @@
 //  1 --> Work PC (AMD Radeon card)
 //  2 --> Macbook Pro  16" 2019 (AMD Radeon card)
 
-#define DEVICE_TYPE 0
+#define DEVICE_TYPE 1
 
 #if DEVICE_TYPE == 0
 
@@ -72,6 +72,9 @@
 #define THERMAL_VIDEO_PATH "camera_ir/video.mp4"
 #define THERMAL_TIMESTAMPS_PATH "camera_ir/timestamps.txt"
 #define CAMERA_TIMESTAMPS_PATH "camera_left_front/timestamps.txt"
+#define LIDAR_CENTER_PATH "lidar_center/"
+#define LIDAR_LEFT_PATH "lidar_left/"
+#define LIDAR_RIGHT_PATH "lidar_right/"
 #define IMU_PATH "imu/imu.txt"
 #define TIME_PATH "gnss/time.txt"
 #define POSE_PATH "gnss/pose.txt"
