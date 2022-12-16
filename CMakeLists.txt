@@ -1,9 +1,12 @@
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
 
 set(NAME VulkanComputeEngine)
 project(${NAME} VERSION 0.1)
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
+
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 
 file(GLOB_RECURSE SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp ${PROJECT_SOURCE_DIR}/external/sunset/sunset.cpp)
@@ -25,11 +28,12 @@ add_subdirectory(external/imgui)
 target_link_directories(${PROJECT_NAME} PRIVATE external/imgui/)
 
 find_package(Vulkan REQUIRED)
-
 find_package(OpenCV REQUIRED)
-include_directories(${OpenCV_INCLUDE_DIRS})
+find_package(PCL 1.10 REQUIRED COMPONENTS common io)
 
-find_package(PCL 1.3 REQUIRED COMPONENTS common io)
+include_directories(${OpenCV_INCLUDE_DIRS} ${PCL_INCLUDE_DIRS})
+link_directories(${PCL_LIBRARY_DIRS})
+add_definitions(${PCL_DEFINITIONS})
 
 target_link_libraries(${NAME} Vulkan::Vulkan SDL2 fmt glm ImGui ${OpenCV_LIBS} ${PCL_LIBRARIES} -ldl -pthread)
 
