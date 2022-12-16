@@ -33,6 +33,7 @@ public:
             max_temp.emplace_back(_max_temp);
         }
 
+
         io::CSVReader<11> in_imu(std::string(SESSION_PATH) + std::string(IMU_PATH));
         float _acc_x, _acc_y, _acc_z, _ang_vel_x, _ang_vel_y, _ang_vel_z, _quat_x, _quat_y, _quat_z, _quat_w;
         while (in_imu.read_row(_timestamp, _acc_x, _acc_y, _acc_z, _ang_vel_x, _ang_vel_y, _ang_vel_z, _quat_x, _quat_y,
@@ -176,7 +177,7 @@ public:
 
             return leftVideo.read(dataset->leftCameraFrame) &&
                    rightVideo.read(dataset->rightCameraFrame) &&
-                   thermalVideo.read(dataset->thermalCameraFrame);
+                   (thermal_timestamps.empty() || thermalVideo.read(dataset->thermalCameraFrame));
         }
         return false;
     }

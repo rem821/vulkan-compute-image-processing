@@ -18,8 +18,7 @@
 
 // Content section
 #define VIDEO_DOWNSCALE_FACTOR 1
-#define SESSION_PATH "/home/standa/3_1_1_1/"
-#define IMAGE_PATH "../assets/haze.jpg"
+#define SESSION_PATH "/media/standa/Hry/utorrent/1_1_1_1/"
 
 // Shaders section
 #define WORKGROUP_COUNT 64
@@ -33,7 +32,6 @@
 // Content section
 #define VIDEO_DOWNSCALE_FACTOR 1
 #define SESSION_PATH "/mnt/B0E0DAB9E0DA84CE/BUD/3_1_1_1/"
-#define IMAGE_PATH "../assets/image.jpg"
 
 // Shaders section
 #define WORKGROUP_COUNT 64
